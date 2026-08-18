@@ -1,0 +1,15 @@
+# CoS — household chief of staff
+# Core agent framework
+strands-agents>=1.52.0
+strands-agents-tools>=0.8.6
+
+# Model provider: Anthropic API directly (swap to Bedrock later — see README)
+anthropic>=0.122.0
+
+# Telegram bot (chosen over the community strands-telegram / strands-telegram-listener
+# packages per the spec's own fallback recommendation — see README "Design deviations")
+# job-queue extra pulls in APScheduler, used for the daily nudge scheduler.
+python-telegram-bot[job-queue]>=22.8
+
+# Config / env
+python-dotenv>=1.0.1

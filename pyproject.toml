@@ -1,0 +1,22 @@
+[project]
+name = "cos"
+version = "0.1.0"
+description = "CoS — household chief of staff Telegram bot on the Strands Agents SDK"
+requires-python = ">=3.11"
+dependencies = [
+    "strands-agents>=1.52.0",
+    "strands-agents-tools>=0.8.6",
+    "anthropic>=0.122.0",
+    "python-telegram-bot[job-queue]>=22.8",
+    "python-dotenv>=1.0.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
