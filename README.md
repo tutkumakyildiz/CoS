@@ -12,6 +12,7 @@ Household chief-of-staff Telegram bot, built on the [Strands Agents SDK](https:/
 - **On-demand queries** — partners can ask CoS about tasks any time ("what should I get from the market", "what's on my list"), not just at scheduled check-ins; steered entirely via the system prompt's new ON-DEMAND QUERIES section, using the existing `get_open_tasks` tool.
 - **Natural-language task completion** — a plain mention like "I bought milk" (not just the nudge's "Done" button) gets matched against `get_open_tasks` and closed via `mark_done`; ambiguous matches get an `ask_choice` disambiguation, no match gets a brief "didn't find that" reply, and a single clear match always gets a brief confirmation. Steered by the new COMPLETION VIA NATURAL LANGUAGE system-prompt section (`src/cos/prompts.py`).
 - **Weekly metrics summary** — `telegram_bot/bot.py` registers a second `JobQueue.run_daily` job restricted to one weekday (default Sunday, configurable via `COS_METRICS_WEEKDAY`/`COS_METRICS_HOUR`) that runs the new WEEKLY STATS behavior. `task_store.get_weekly_metrics` computes, over the trailing week: the % of tasks captured by each partner, the % of tasks completed by each partner, and the % of completions that needed no reminder — all percentages computed in the tool itself (not left to the model) to avoid arithmetic mistakes. Posted neutrally, no praise/blame — this is a narrower, purpose-built replacement for the spec's cut weekly digest (see "Design deviations"), not that feature reinstated. `tasks` gained a `completed_at` column (`db.py`, migrated in place for existing databases, with a one-time backfill from `updated_at` for tasks already marked done before this column existed) since completion needs a real timestamp to bucket by week; `mark_done` and `update_task(status="done")` both set it.
+- **Reply safety net** (`src/cos/response_tracker.py`) — claude-haiku-4-5 was found live to sometimes fetch data via a read tool (e.g. `get_open_tasks`) and then just write the answer as plain assistant text instead of calling `send_message`/`ask_choice`, silently dropping the reply since those are the agent's only channel out. `ResponseTracker` hooks into Strands' `AfterToolCallEvent` (no changes needed in the tool functions themselves) to detect "ran a tool but never replied" per turn, and `telegram_bot/bot.py`'s `_invoke_agent` retries once with an explicit nudge when that happens — while leaving genuine silence (no tool call at all, e.g. ignored idle chatter) untouched.
 - `calendar_tool` — spec §4.2, **stubbed**: always reports "not connected." Real Google Calendar wiring is Week 2.
 - System prompt from spec §5, plus a household-context block (partner names/ids, numbered `Partner 1`/`Partner 2` role tags for `ask_choice` button labels) and a note that `send_message`/`ask_choice` are the agent's *only* reply channel.
 - End-to-end capture → confirm → ask-ownership-via-buttons → assign loop works (this pulls the Week-2 "ownership inline keyboards" item forward since it's what makes the MVP demoable).
@@ -25,6 +26,8 @@ Personalized `ask_choice` button labels and on-demand queries are now **live-tes
 The daily nudge's one-tap "Done" button and natural-language completion (e.g. "I bought milk") are both now **live-tested and confirmed working** — a task can be closed either way.
 
 The weekly metrics summary is also now **live-tested and confirmed working** — verified by temporarily pointing `COS_METRICS_WEEKDAY`/`COS_METRICS_HOUR`/`COS_METRICS_MINUTE` at a few minutes out (one-off shell env vars, not written to `.env`) instead of waiting for Sunday. The `weekly_metrics_check` job fired on schedule, called `get_weekly_metrics`, and posted the summary to the group — user confirmed "works fine."
+
+**Bug found + fixed live (2026-08-18): on-demand queries silently dropped their reply.** A real question in the group ("I'm at the supermarket now, what do we need?") got `get_open_tasks` called correctly but no reply ever posted — claude-haiku-4-5 wrote the answer as final assistant text instead of calling `send_message`. Fixed with the reply safety net above (`response_tracker.py` + `_invoke_agent`'s retry). Confirmed live: the exact same message hit the exact same failure again post-fix (`get_open_tasks` called, no reply) — logged a warning, retried once, and the retry successfully called `send_message`. User confirmed "works fine now."
 
 **Model swapped to `claude-haiku-4-5` (2026-08-18)**, down from `claude-sonnet-4-5-20250929`, for cost — Haiku is ~5x cheaper on both input and output and the bot's per-turn workload (short capture/confirm/ownership replies, on-demand queries) doesn't need Sonnet-tier reasoning. Updated in `.env`, `.env.example`, and the fallback default in `config.py`. Verified via the unit test suite, a direct Anthropic API call against the new model id, and a live bot run in the real household group chat — no regressions.
 
@@ -113,6 +116,7 @@ src/cos/
   db.py                # sqlite schema (tasks)
   agent.py             # builds the one Strands Agent, per chat_id
   prompts.py           # system prompt (spec §5) + household context
+  response_tracker.py  # detects "ran a tool but never replied" per turn
   main.py              # entry point
   tools/
     task_store.py       # spec §4.1
@@ -124,6 +128,7 @@ tests/
   test_task_store.py
   test_bot.py
   test_db.py
+  test_response_tracker.py
 ```
 
 ## Next up
