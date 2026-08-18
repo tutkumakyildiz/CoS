@@ -97,7 +97,8 @@ def build_task_store_tools(chat_id: str) -> list:
             fields: Partial dict of fields to change. Allowed keys: title, category,
                 owner, due_date, status, recurrence, last_nudge_at. status must be one
                 of open, in_progress, done, snoozed — never delete a task, use status
-                'done' or 'snoozed' instead.
+                'done' or 'snoozed' instead. Setting status to 'done' this way also
+                records completed_at automatically, same as mark_done.
 
         Returns:
             The updated task record.
@@ -113,8 +114,12 @@ def build_task_store_tools(chat_id: str) -> list:
         if not fields:
             raise ValueError("fields must not be empty")
 
+        now = _now()
+        if fields.get("status") == "done":
+            fields = {**fields, "completed_at": now}
+
         set_clause = ", ".join(f"{k} = ?" for k in fields)
-        values = list(fields.values()) + [_now(), task_id, chat_id]
+        values = list(fields.values()) + [now, task_id, chat_id]
         with cursor() as cur:
             cur.execute(
                 f"UPDATE tasks SET {set_clause}, updated_at = ? WHERE task_id = ? AND chat_id = ?",
@@ -136,8 +141,9 @@ def build_task_store_tools(chat_id: str) -> list:
         now = _now()
         with cursor() as cur:
             cur.execute(
-                "UPDATE tasks SET status = 'done', updated_at = ? WHERE task_id = ? AND chat_id = ?",
-                (now, task_id, chat_id),
+                "UPDATE tasks SET status = 'done', updated_at = ?, completed_at = ? "
+                "WHERE task_id = ? AND chat_id = ?",
+                (now, now, task_id, chat_id),
             )
             if cur.rowcount == 0:
                 raise ValueError(f"No task {task_id} found in this chat")
@@ -197,4 +203,84 @@ def build_task_store_tools(chat_id: str) -> list:
             rows = cur.fetchall()
         return [_row_to_dict(r) for r in rows]
 
-    return [create_task, update_task, mark_done, get_open_tasks, get_overdue_tasks, get_due_soon_tasks]
+    @tool
+    def get_weekly_metrics(days: int = 7) -> dict[str, Any]:
+        """Basic usage metrics for this chat over the last `days` days, for the
+        weekly stats summary — spec §7 "basic metrics logging". Percentages are
+        computed here (not left to the model) to avoid arithmetic mistakes.
+
+        Args:
+            days: How many days back to look. Defaults to 7 (one week).
+
+        Returns:
+            since: ISO date the window starts at.
+            captured_total / captured_by_owner / captured_pct_by_owner: tasks
+                created in the window, grouped by created_by (who reported it).
+            completed_total / completed_by_owner / completed_pct_by_owner: tasks
+                completed in the window, grouped by owner (who it was assigned to).
+            resolved_without_nudge / resolved_with_nudge / resolved_without_nudge_pct:
+                of the tasks completed in the window, how many were closed out
+                before CoS ever had to send a reminder for them.
+            Owner/created_by keys are telegram user ids — map them to display
+            names from the household roster before showing this to anyone.
+        """
+        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+        since = (date.today() - timedelta(days=days)).isoformat()
+
+        def _grouped_pct(counts: dict[str, int], total: int) -> dict[str, float]:
+            if total == 0:
+                return {}
+            return {k: round(100 * v / total, 1) for k, v in counts.items()}
+
+        with cursor() as cur:
+            cur.execute(
+                "SELECT created_by, COUNT(*) AS n FROM tasks "
+                "WHERE chat_id = ? AND created_at >= ? GROUP BY created_by",
+                (chat_id, cutoff),
+            )
+            captured_by_owner = {row["created_by"]: row["n"] for row in cur.fetchall()}
+
+            cur.execute(
+                "SELECT owner, COUNT(*) AS n FROM tasks "
+                "WHERE chat_id = ? AND status = 'done' AND completed_at >= ? "
+                "GROUP BY owner",
+                (chat_id, cutoff),
+            )
+            completed_by_owner = {(row["owner"] or "unassigned"): row["n"] for row in cur.fetchall()}
+
+            cur.execute(
+                "SELECT last_nudge_at FROM tasks "
+                "WHERE chat_id = ? AND status = 'done' AND completed_at >= ?",
+                (chat_id, cutoff),
+            )
+            nudge_flags = [row["last_nudge_at"] for row in cur.fetchall()]
+
+        captured_total = sum(captured_by_owner.values())
+        completed_total = sum(completed_by_owner.values())
+        resolved_without_nudge = sum(1 for flag in nudge_flags if flag is None)
+        resolved_with_nudge = len(nudge_flags) - resolved_without_nudge
+
+        return {
+            "since": since,
+            "captured_total": captured_total,
+            "captured_by_owner": captured_by_owner,
+            "captured_pct_by_owner": _grouped_pct(captured_by_owner, captured_total),
+            "completed_total": completed_total,
+            "completed_by_owner": completed_by_owner,
+            "completed_pct_by_owner": _grouped_pct(completed_by_owner, completed_total),
+            "resolved_without_nudge": resolved_without_nudge,
+            "resolved_with_nudge": resolved_with_nudge,
+            "resolved_without_nudge_pct": (
+                round(100 * resolved_without_nudge / completed_total, 1) if completed_total else 0.0
+            ),
+        }
+
+    return [
+        create_task,
+        update_task,
+        mark_done,
+        get_open_tasks,
+        get_overdue_tasks,
+        get_due_soon_tasks,
+        get_weekly_metrics,
+    ]
