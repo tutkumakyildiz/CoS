@@ -17,11 +17,13 @@ from strands.models.anthropic import AnthropicModel
 
 from cos.config import Settings
 from cos.prompts import build_system_prompt
+from cos.response_tracker import ResponseTracker
 from cos.tools.calendar_tool import build_calendar_tools
 from cos.tools.task_store import build_task_store_tools
 from cos.tools.telegram_tools import build_telegram_tools
 
 _agents: dict[str, Agent] = {}
+_trackers: dict[str, ResponseTracker] = {}
 
 
 def get_agent(settings: Settings, bot: Bot) -> Agent:
@@ -42,11 +44,20 @@ def get_agent(settings: Settings, bot: Bot) -> Agent:
         *build_calendar_tools(),
     ]
 
+    tracker = ResponseTracker()
     agent = Agent(
         model=model,
         tools=tools,
         system_prompt=build_system_prompt(chat_id, settings.household.partners),
         conversation_manager=SlidingWindowConversationManager(window_size=40),
+        hooks=[tracker],
     )
     _agents[chat_id] = agent
+    _trackers[chat_id] = tracker
     return agent
+
+
+def get_response_tracker(settings: Settings) -> ResponseTracker:
+    """The ResponseTracker for this chat's agent — call get_agent(settings, bot)
+    at least once first so it's been created."""
+    return _trackers[settings.household.chat_id]
