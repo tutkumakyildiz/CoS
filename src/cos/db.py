@@ -25,22 +25,34 @@ CREATE TABLE IF NOT EXISTS tasks (
     source_message  TEXT,
     created_at      TEXT NOT NULL,
     updated_at      TEXT NOT NULL,
-    last_nudge_at   TEXT
+    last_nudge_at   TEXT,
+    completed_at    TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_chat_status ON tasks (chat_id, status);
 CREATE INDEX IF NOT EXISTS idx_tasks_chat_owner ON tasks (chat_id, owner);
-
-CREATE TABLE IF NOT EXISTS digest_log (
-    id                   INTEGER PRIMARY KEY AUTOINCREMENT,
-    week_of              TEXT NOT NULL,
-    chat_id              TEXT NOT NULL,
-    open_count_by_owner  TEXT NOT NULL,  -- JSON
-    sent_at              TEXT NOT NULL
-);
 """
 
 _connection: sqlite3.Connection | None = None
+
+
+def _migrate(conn: sqlite3.Connection) -> None:
+    """Add columns that postdate a database file's original creation.
+
+    `CREATE TABLE IF NOT EXISTS` in SCHEMA only helps brand-new databases —
+    an existing `data/cos.db` from before `completed_at` was added needs the
+    column added explicitly, or metrics queries against it will fail.
+    """
+    existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(tasks)")}
+    if "completed_at" not in existing_cols:
+        conn.execute("ALTER TABLE tasks ADD COLUMN completed_at TEXT")
+        # Backfill: tasks already marked done before this column existed have
+        # no real completion timestamp on record, but the convention (spec
+        # §8: never touch a task after marking it done) means updated_at on
+        # a done row is effectively its completion time — a fine one-time
+        # substitute so pre-existing completions aren't invisible to metrics.
+        conn.execute("UPDATE tasks SET completed_at = updated_at WHERE status = 'done' AND completed_at IS NULL")
+        conn.commit()
 
 
 def init_db(db_path: Path) -> sqlite3.Connection:
@@ -56,6 +68,7 @@ def init_db(db_path: Path) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     conn.executescript(SCHEMA)
     conn.commit()
+    _migrate(conn)
     _connection = conn
     return conn
 

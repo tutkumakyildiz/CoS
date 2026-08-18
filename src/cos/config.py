@@ -38,6 +38,9 @@ class Settings:
     household: HouseholdConfig
     nudge_hour: int
     nudge_timezone: tzinfo
+    metrics_hour: int
+    metrics_minute: int
+    metrics_weekday: int  # python-telegram-bot JobQueue convention: 0=Sunday..6=Saturday
 
 
 def _load_household(path: Path) -> HouseholdConfig:
@@ -88,4 +91,7 @@ def load_settings() -> Settings:
         household=_load_household(household_path),
         nudge_hour=int(os.environ.get("COS_NUDGE_HOUR", "9")),
         nudge_timezone=_resolve_timezone(os.environ.get("COS_TIMEZONE")),
+        metrics_hour=int(os.environ.get("COS_METRICS_HOUR", "10")),
+        metrics_minute=int(os.environ.get("COS_METRICS_MINUTE", "0")),
+        metrics_weekday=int(os.environ.get("COS_METRICS_WEEKDAY", "0")),
     )

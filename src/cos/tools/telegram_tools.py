@@ -8,7 +8,7 @@ other than the one it's running for.
 
 Two tools, matching the two shapes of outbound message the system prompt
 (spec §5) actually needs:
-- send_message: plain text (confirmations, nudges, digests)
+- send_message: plain text (confirmations, nudges, query replies)
 - ask_choice: text + inline keyboard buttons (ownership decisions), where each
   tapped button routes back into the agent via the bot's callback handler
   (see telegram_bot/bot.py)

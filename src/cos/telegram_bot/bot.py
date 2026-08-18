@@ -90,6 +90,22 @@ async def _handle_daily_nudge_check(context: ContextTypes.DEFAULT_TYPE) -> None:
         logger.exception("Agent failed running daily nudge check")
 
 
+async def _handle_weekly_metrics_check(context: ContextTypes.DEFAULT_TYPE) -> None:
+    settings: Settings = context.job.data
+    chat_id = settings.household.chat_id
+    instruction = (
+        f"{_today_prefix()} Scheduled weekly stats check for chat_id {chat_id}. Run "
+        "the WEEKLY STATS behavior now: call get_weekly_metrics and post the summary "
+        "via send_message."
+    )
+
+    agent = get_agent(settings, context.bot)
+    try:
+        await agent.invoke_async(instruction)
+    except Exception:
+        logger.exception("Agent failed running weekly metrics check")
+
+
 def build_application(settings: Settings) -> Application:
     chat_id = int(settings.household.chat_id)
 
@@ -112,6 +128,14 @@ def build_application(settings: Settings) -> Application:
         _handle_daily_nudge_check,
         time=time(hour=settings.nudge_hour, tzinfo=settings.nudge_timezone),
         name="daily_nudge_check",
+        chat_id=chat_id,
+        data=settings,
+    )
+    app.job_queue.run_daily(
+        _handle_weekly_metrics_check,
+        time=time(hour=settings.metrics_hour, minute=settings.metrics_minute, tzinfo=settings.nudge_timezone),
+        days=(settings.metrics_weekday,),
+        name="weekly_metrics_check",
         chat_id=chat_id,
         data=settings,
     )
