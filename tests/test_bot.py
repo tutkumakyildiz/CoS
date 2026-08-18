@@ -25,12 +25,21 @@ def settings():
             household=HouseholdConfig(chat_id="-100123", partners={"111": "Alex", "222": "Sam"}),
             nudge_hour=9,
             nudge_timezone=ZoneInfo("UTC"),
+            metrics_hour=10,
+            metrics_minute=0,
+            metrics_weekday=0,
         )
 
 
 def test_build_application_registers_daily_nudge_job(settings):
     app = build_application(settings)
     jobs = app.job_queue.get_jobs_by_name("daily_nudge_check")
+    assert len(jobs) == 1
+
+
+def test_build_application_registers_weekly_metrics_job(settings):
+    app = build_application(settings)
+    jobs = app.job_queue.get_jobs_by_name("weekly_metrics_check")
     assert len(jobs) == 1
 
 

@@ -134,3 +134,54 @@ def test_due_soon_excludes_done_tasks(tools):
     _call(tools["mark_done"], task_id=task["task_id"])
 
     assert _call(tools["get_due_soon_tasks"], days=2) == []
+
+
+def test_mark_done_records_completed_at(tools):
+    task = _call(tools["create_task"], title="Book dentist", category="appointment", created_by="111")
+    assert task["completed_at"] is None
+    done = _call(tools["mark_done"], task_id=task["task_id"])
+    assert done["completed_at"] is not None
+
+
+def test_update_task_status_done_records_completed_at(tools):
+    task = _call(tools["create_task"], title="Renew passport", category="admin", created_by="111")
+    updated = _call(tools["update_task"], task_id=task["task_id"], fields={"status": "done"})
+    assert updated["completed_at"] is not None
+
+
+def test_weekly_metrics_captured_and_completed_by_owner(tools):
+    t1 = _call(tools["create_task"], title="Buy milk", category="errand", created_by="111")
+    _call(tools["create_task"], title="Renew passport", category="admin", created_by="222")
+    _call(tools["create_task"], title="Book dentist", category="appointment", created_by="222")
+    _call(tools["update_task"], task_id=t1["task_id"], fields={"owner": "111"})
+    _call(tools["mark_done"], task_id=t1["task_id"])
+
+    metrics = _call(tools["get_weekly_metrics"], days=7)
+    assert metrics["captured_total"] == 3
+    assert metrics["captured_by_owner"] == {"111": 1, "222": 2}
+    assert metrics["captured_pct_by_owner"] == {"111": pytest.approx(33.3), "222": pytest.approx(66.7)}
+    assert metrics["completed_total"] == 1
+    assert metrics["completed_by_owner"] == {"111": 1}
+    assert metrics["completed_pct_by_owner"] == {"111": 100.0}
+
+
+def test_weekly_metrics_resolved_without_nudge(tools):
+    t1 = _call(tools["create_task"], title="Buy milk", category="errand", created_by="111")
+    t2 = _call(tools["create_task"], title="Return library books", category="errand", created_by="111")
+    _call(tools["mark_done"], task_id=t1["task_id"])
+    _call(tools["update_task"], task_id=t2["task_id"], fields={"last_nudge_at": "2020-01-01T00:00:00+00:00"})
+    _call(tools["mark_done"], task_id=t2["task_id"])
+
+    metrics = _call(tools["get_weekly_metrics"], days=7)
+    assert metrics["resolved_without_nudge"] == 1
+    assert metrics["resolved_with_nudge"] == 1
+    assert metrics["resolved_without_nudge_pct"] == 50.0
+
+
+def test_weekly_metrics_empty_window_returns_zeros(tools):
+    metrics = _call(tools["get_weekly_metrics"], days=7)
+    assert metrics["captured_total"] == 0
+    assert metrics["captured_by_owner"] == {}
+    assert metrics["captured_pct_by_owner"] == {}
+    assert metrics["completed_total"] == 0
+    assert metrics["resolved_without_nudge_pct"] == 0.0
