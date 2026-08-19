@@ -16,6 +16,7 @@ from strands.agent.conversation_manager import SlidingWindowConversationManager
 from strands.models.anthropic import AnthropicModel
 
 from cos.config import Settings
+from cos.persistence import get_backend
 from cos.prompts import build_system_prompt
 from cos.response_tracker import ResponseTracker
 from cos.tools.calendar_tool import build_calendar_tools
@@ -39,7 +40,7 @@ def get_agent(settings: Settings, bot: Bot) -> Agent:
     )
 
     tools = [
-        *build_task_store_tools(chat_id),
+        *build_task_store_tools(chat_id, get_backend(settings)),
         *build_telegram_tools(bot, chat_id),
         *build_calendar_tools(),
     ]

@@ -9,10 +9,15 @@ dependencies = [
     "anthropic>=0.122.0",
     "python-telegram-bot[job-queue]>=22.8",
     "python-dotenv>=1.0.1",
+    "boto3>=1.34.0",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0.0"]
+dev = ["pytest>=8.0.0", "moto[dynamodb]>=5.0.0"]
+# Only needed to deploy runtime_entrypoint.py to Bedrock AgentCore Runtime —
+# not installed by default. Exact package name/version unverified against a
+# real deploy yet; confirm against AWS's current docs first (design spec §8).
+agentcore = ["bedrock-agentcore"]
 
 [build-system]
 requires = ["setuptools>=68"]
