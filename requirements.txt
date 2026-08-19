@@ -13,3 +13,8 @@ python-telegram-bot[job-queue]>=22.8
 
 # Config / env
 python-dotenv>=1.0.1
+
+# AWS SDK — used by the DynamoDB persistence backend (hackathon/AgentCore
+# target, design spec §8). Importable/installable without an AWS account;
+# only makes real calls when COS_PERSISTENCE_BACKEND=dynamodb is actually set.
+boto3>=1.34.0

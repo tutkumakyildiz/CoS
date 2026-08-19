@@ -10,36 +10,38 @@ Each tool is bound to a single `chat_id` at construction time via
 another chat's tasks (spec §8 constraint: "Only act on tasks in this chat's
 own task list") — that's enforced in code, not just the prompt.
 
-Backed by SQLite — spec §8 left this open pending a Google Sheets
-implementation, but SQLite is the permanent choice for this project
-(decided 2026-08-18, see README "Design deviations"), not a placeholder.
+Persistence lives behind `cos.persistence.TaskStoreBackend` (design spec §8)
+— SQLite by default (today), swappable to DynamoDB for the hackathon/
+AgentCore target via `COS_PERSISTENCE_BACKEND`. These tool functions only
+validate input and shape the response; they never touch SQL or DynamoDB
+directly.
 """
 
 from __future__ import annotations
 
-import uuid
-from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
 from strands import tool
 
-from cos.db import cursor
+from cos.persistence.base import TaskStoreBackend
+from cos.persistence.sqlite_backend import SqliteTaskStoreBackend
 
 VALID_CATEGORIES = {"errand", "admin", "gift", "appointment", "recurring", "other"}
 VALID_STATUSES = {"open", "in_progress", "done", "snoozed"}
-OPEN_STATUSES = ("open", "in_progress")
 
 
-def _now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+def build_task_store_tools(chat_id: str, backend: TaskStoreBackend | None = None) -> list:
+    """Build the task_store tool set, scoped to one chat_id.
 
-
-def _row_to_dict(row) -> dict[str, Any]:
-    return dict(row)
-
-
-def build_task_store_tools(chat_id: str) -> list:
-    """Build the task_store tool set, scoped to one chat_id."""
+    Args:
+        chat_id: The chat this tool set is scoped to (enforced here, not just
+            in the prompt — spec §8 constraint).
+        backend: Persistence backend to use. Defaults to a fresh SQLite
+            backend (today's behavior) if not given — pass a DynamoDB
+            backend (via `cos.persistence.get_backend`) for the hackathon/
+            AgentCore path.
+    """
+    backend = backend or SqliteTaskStoreBackend()
 
     @tool
     def create_task(
@@ -71,22 +73,16 @@ def build_task_store_tools(chat_id: str) -> list:
         if category not in VALID_CATEGORIES:
             raise ValueError(f"category must be one of {sorted(VALID_CATEGORIES)}, got {category!r}")
 
-        task_id = str(uuid.uuid4())
-        now = _now()
-        with cursor() as cur:
-            cur.execute(
-                """
-                INSERT INTO tasks (
-                    task_id, chat_id, title, category, created_by, owner,
-                    due_date, status, recurrence, source_message,
-                    created_at, updated_at, last_nudge_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?, NULL)
-                """,
-                (task_id, chat_id, title, category, created_by, owner, due_date, recurrence, source_message, now, now),
-            )
-            cur.execute("SELECT * FROM tasks WHERE task_id = ?", (task_id,))
-            row = cur.fetchone()
-        return _row_to_dict(row)
+        return backend.create_task(
+            chat_id=chat_id,
+            title=title,
+            category=category,
+            created_by=created_by,
+            due_date=due_date,
+            owner=owner,
+            recurrence=recurrence,
+            source_message=source_message,
+        )
 
     @tool
     def update_task(task_id: str, fields: dict[str, Any]) -> dict[str, Any]:
@@ -114,22 +110,7 @@ def build_task_store_tools(chat_id: str) -> list:
         if not fields:
             raise ValueError("fields must not be empty")
 
-        now = _now()
-        if fields.get("status") == "done":
-            fields = {**fields, "completed_at": now}
-
-        set_clause = ", ".join(f"{k} = ?" for k in fields)
-        values = list(fields.values()) + [now, task_id, chat_id]
-        with cursor() as cur:
-            cur.execute(
-                f"UPDATE tasks SET {set_clause}, updated_at = ? WHERE task_id = ? AND chat_id = ?",
-                values,
-            )
-            if cur.rowcount == 0:
-                raise ValueError(f"No task {task_id} found in this chat")
-            cur.execute("SELECT * FROM tasks WHERE task_id = ?", (task_id,))
-            row = cur.fetchone()
-        return _row_to_dict(row)
+        return backend.update_task(chat_id=chat_id, task_id=task_id, fields=fields)
 
     @tool
     def mark_done(task_id: str) -> dict[str, Any]:
@@ -138,18 +119,7 @@ def build_task_store_tools(chat_id: str) -> list:
         Args:
             task_id: The task's id.
         """
-        now = _now()
-        with cursor() as cur:
-            cur.execute(
-                "UPDATE tasks SET status = 'done', updated_at = ?, completed_at = ? "
-                "WHERE task_id = ? AND chat_id = ?",
-                (now, now, task_id, chat_id),
-            )
-            if cur.rowcount == 0:
-                raise ValueError(f"No task {task_id} found in this chat")
-            cur.execute("SELECT * FROM tasks WHERE task_id = ?", (task_id,))
-            row = cur.fetchone()
-        return _row_to_dict(row)
+        return backend.mark_done(chat_id=chat_id, task_id=task_id)
 
     @tool
     def get_open_tasks(owner: str | None = None) -> list[dict[str, Any]]:
@@ -158,29 +128,12 @@ def build_task_store_tools(chat_id: str) -> list:
         Args:
             owner: Telegram user id to filter by. Leave unset to get all open tasks.
         """
-        query = "SELECT * FROM tasks WHERE chat_id = ? AND status IN (?, ?)"
-        params: list[Any] = [chat_id, *OPEN_STATUSES]
-        if owner is not None:
-            query += " AND owner = ?"
-            params.append(owner)
-        query += " ORDER BY due_date IS NULL, due_date ASC, created_at ASC"
-        with cursor() as cur:
-            cur.execute(query, params)
-            rows = cur.fetchall()
-        return [_row_to_dict(r) for r in rows]
+        return backend.get_open_tasks(chat_id=chat_id, owner=owner)
 
     @tool
     def get_overdue_tasks() -> list[dict[str, Any]]:
         """List tasks in this chat that are open/in_progress and past their due_date."""
-        today = date.today().isoformat()
-        with cursor() as cur:
-            cur.execute(
-                "SELECT * FROM tasks WHERE chat_id = ? AND status IN (?, ?) "
-                "AND due_date IS NOT NULL AND due_date < ? ORDER BY due_date ASC",
-                (chat_id, *OPEN_STATUSES, today),
-            )
-            rows = cur.fetchall()
-        return [_row_to_dict(r) for r in rows]
+        return backend.get_overdue_tasks(chat_id=chat_id)
 
     @tool
     def get_due_soon_tasks(days: int = 2) -> list[dict[str, Any]]:
@@ -191,17 +144,7 @@ def build_task_store_tools(chat_id: str) -> list:
         Args:
             days: How many days ahead counts as "due soon". Defaults to 2.
         """
-        today = date.today()
-        today_iso = today.isoformat()
-        horizon_iso = (today + timedelta(days=days)).isoformat()
-        with cursor() as cur:
-            cur.execute(
-                "SELECT * FROM tasks WHERE chat_id = ? AND status IN (?, ?) "
-                "AND due_date IS NOT NULL AND due_date >= ? AND due_date <= ? ORDER BY due_date ASC",
-                (chat_id, *OPEN_STATUSES, today_iso, horizon_iso),
-            )
-            rows = cur.fetchall()
-        return [_row_to_dict(r) for r in rows]
+        return backend.get_due_soon_tasks(chat_id=chat_id, days=days)
 
     @tool
     def get_weekly_metrics(days: int = 7) -> dict[str, Any]:
@@ -224,56 +167,7 @@ def build_task_store_tools(chat_id: str) -> list:
             Owner/created_by keys are telegram user ids — map them to display
             names from the household roster before showing this to anyone.
         """
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
-        since = (date.today() - timedelta(days=days)).isoformat()
-
-        def _grouped_pct(counts: dict[str, int], total: int) -> dict[str, float]:
-            if total == 0:
-                return {}
-            return {k: round(100 * v / total, 1) for k, v in counts.items()}
-
-        with cursor() as cur:
-            cur.execute(
-                "SELECT created_by, COUNT(*) AS n FROM tasks "
-                "WHERE chat_id = ? AND created_at >= ? GROUP BY created_by",
-                (chat_id, cutoff),
-            )
-            captured_by_owner = {row["created_by"]: row["n"] for row in cur.fetchall()}
-
-            cur.execute(
-                "SELECT owner, COUNT(*) AS n FROM tasks "
-                "WHERE chat_id = ? AND status = 'done' AND completed_at >= ? "
-                "GROUP BY owner",
-                (chat_id, cutoff),
-            )
-            completed_by_owner = {(row["owner"] or "unassigned"): row["n"] for row in cur.fetchall()}
-
-            cur.execute(
-                "SELECT last_nudge_at FROM tasks "
-                "WHERE chat_id = ? AND status = 'done' AND completed_at >= ?",
-                (chat_id, cutoff),
-            )
-            nudge_flags = [row["last_nudge_at"] for row in cur.fetchall()]
-
-        captured_total = sum(captured_by_owner.values())
-        completed_total = sum(completed_by_owner.values())
-        resolved_without_nudge = sum(1 for flag in nudge_flags if flag is None)
-        resolved_with_nudge = len(nudge_flags) - resolved_without_nudge
-
-        return {
-            "since": since,
-            "captured_total": captured_total,
-            "captured_by_owner": captured_by_owner,
-            "captured_pct_by_owner": _grouped_pct(captured_by_owner, captured_total),
-            "completed_total": completed_total,
-            "completed_by_owner": completed_by_owner,
-            "completed_pct_by_owner": _grouped_pct(completed_by_owner, completed_total),
-            "resolved_without_nudge": resolved_without_nudge,
-            "resolved_with_nudge": resolved_with_nudge,
-            "resolved_without_nudge_pct": (
-                round(100 * resolved_without_nudge / completed_total, 1) if completed_total else 0.0
-            ),
-        }
+        return backend.get_weekly_metrics(chat_id=chat_id, days=days)
 
     return [
         create_task,
