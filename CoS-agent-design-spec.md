@@ -1,6 +1,6 @@
-# CoS — Household chief of staff (Telegram + Strands) — Design Spec for Implementation
+# CoS — Household Chief of Staff (Telegram + Strands) — Design Spec
 
-**Purpose of this doc:** hand this to Cursor as the spec. It defines architecture, tools, data model, and system prompts so implementation can start directly without re-deriving design decisions.
+Original design spec, written before implementation began. It covers the intended architecture, tools, data model, and system prompt. Some of this changed once real building and live-testing started — see [`README.md`](README.md)'s "Design deviations" table for what actually shipped and why.
 
 ---
 
@@ -66,7 +66,7 @@ Scheduler: EventBridge (or cron if running on a single EC2/Fargate task)
 | `created_at` / `updated_at` | timestamp | |
 | `last_nudge_at` | timestamp \| null | prevents nag spam |
 
-**`digest_log` table** (optional, for tracking whether digests reduce imbalance over time)
+**`digest_log` table** (optional, for tracking whether digests reduce imbalance over time — not implemented; see README)
 
 | Field | Type |
 |---|---|
@@ -94,7 +94,7 @@ Google Calendar API wrapper (custom, or check if a community Strands tool exists
 - `check_upcoming_events(date_range)` — used to cross-reference seasonal/recurring tasks (e.g. "soccer season starts")
 - `create_event(title, date)` — optional, only if you want tasks to also land on a shared calendar
 
-### 4.3 `digest_generator`
+### 4.3 `digest_generator` (not implemented — see README)
 Custom tool. Pulls from `task_store`, groups by owner, formats a summary string. Keep formatting logic in the tool, not the prompt, so output is consistent.
 
 ### 4.4 `strands-telegram` (community package)
@@ -158,7 +158,7 @@ Constraints:
 2. Agent calls `task_store.get_overdue_tasks` + upcoming due-soon tasks
 3. For each, checks `last_nudge_at`, sends nudge if eligible, updates `last_nudge_at`
 
-**Weekly digest flow (scheduled)**
+**Weekly digest flow (scheduled)** — not implemented; replaced by the weekly stats summary, see README
 1. Scheduler triggers agent: "run weekly digest for chat_id X"
 2. Agent calls `task_store.get_open_tasks` grouped by owner
 3. Agent calls `digest_generator` to format
@@ -186,10 +186,27 @@ Constraints:
 - Run with 3-5 real test households in their own group chats
 - Fix extraction/ownership-assignment edge cases surfaced by real usage
 
+Actual build order and scope diverged from this plan in places (e.g. the weekly digest was cut, metrics logging was redefined) — see README's "Status" and "Design deviations" sections for what actually shipped.
+
 ---
 
-## 8. Open Decisions to Flag for Claude Code
+## 8. Hackathon Target Architecture (Bedrock + AgentCore)
 
-- **Scheduler mechanism**: EventBridge Scheduler triggering a Lambda that invokes the agent, vs. a simple cron inside the same long-running process as the listener. Simpler to keep it in-process for MVP.
-- **Community package risk**: `strands-telegram` and `strands-telegram-listener` are community-maintained, not official. Pin versions, review source before use, and have a fallback plan (raw `python-telegram-bot` + custom Strands tool wrapper) if either package proves unreliable.
-- **Multi-user identity**: MVP assumes exactly 2 partners in one group chat. Telegram user_id → "owner" mapping should be a simple config value per chat, not a full user system.
+CoS is being entered in AWS's **Agents for Humans Hackathon** (Everyday Agents track). This is a planned architecture change, not yet built — it moves the two remaining spec deviations (direct Anthropic API instead of Bedrock, and no AgentCore deployment) back in line with the original design, and adds real AWS depth beyond what §2 called for.
+
+**Key constraint that shapes this:** Amazon Bedrock AgentCore Runtime is a synchronous request/response HTTP service — it has no native support for a long-polling listener or scheduled background jobs. CoS's Telegram polling loop and its two daily `JobQueue` jobs (nudge, weekly metrics) can't move into AgentCore as-is, so the system splits into a **gateway** and a **brain**:
+
+![CoS agent-invocation path: today vs. hackathon target](docs/architecture.svg)
+
+*Today, the gateway calls a Strands Agent running in-process against the Anthropic API and local SQLite. The hackathon target keeps the same gateway, but routes that call through Amazon Bedrock AgentCore Runtime instead — the container hosts the Strands Agent ("brain") wrapped via `BedrockAgentCoreApp` / `@app.entrypoint`, using the same tools (`task_store`, `telegram_tools`, `calendar_tool`) and system prompt (§5) as today, backed by Amazon Bedrock and DynamoDB instead of the Anthropic API and local SQLite.*
+
+Consequences for the existing implementation:
+- The gateway (Telegram polling + scheduling) is unchanged — it just calls the deployed AgentCore endpoint per message/job instead of building a local `Agent` object.
+- `task_store.py`'s persistence moves from SQLite to DynamoDB, keeping the same tool function signatures (`create_task`, `update_task`, `get_open_tasks`, `mark_done`, `get_weekly_metrics`, …) so `agent.py`/`prompts.py` don't need to change.
+- A local-mode fallback (direct Bedrock call, no AgentCore round-trip) stays available behind a config flag, for fast dev iteration without a full container rebuild each time.
+
+Build order for this work: (1) swap `AnthropicModel` → `BedrockModel` in `agent.py` first, verified live, before (2) the gateway/brain split, DynamoDB migration, and AgentCore Runtime deployment. See README's "Status" section for current progress against this once the work starts.
+
+---
+
+*The open decisions originally flagged here (scheduler mechanism, Telegram community-package risk, multi-user identity) were all resolved during implementation — see README.md's "Design deviations" table.*
