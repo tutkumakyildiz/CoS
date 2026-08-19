@@ -41,6 +41,12 @@ class Settings:
     metrics_hour: int
     metrics_minute: int
     metrics_weekday: int  # python-telegram-bot JobQueue convention: 0=Sunday..6=Saturday
+    # Hackathon/AgentCore target (design spec §8) — inert defaults today.
+    # "sqlite" is the only backend actually exercised outside tests until AWS
+    # access is available; "dynamodb" is built and covered by moto tests.
+    persistence_backend: str = "sqlite"
+    dynamodb_table_name: str = "cos_tasks"
+    aws_region: str | None = None
 
 
 def _load_household(path: Path) -> HouseholdConfig:
@@ -94,4 +100,7 @@ def load_settings() -> Settings:
         metrics_hour=int(os.environ.get("COS_METRICS_HOUR", "10")),
         metrics_minute=int(os.environ.get("COS_METRICS_MINUTE", "0")),
         metrics_weekday=int(os.environ.get("COS_METRICS_WEEKDAY", "0")),
+        persistence_backend=os.environ.get("COS_PERSISTENCE_BACKEND", "sqlite"),
+        dynamodb_table_name=os.environ.get("COS_DYNAMODB_TABLE", "cos_tasks"),
+        aws_region=os.environ.get("COS_AWS_REGION") or None,
     )
