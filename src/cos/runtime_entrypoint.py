@@ -1,5 +1,5 @@
 """Amazon Bedrock AgentCore Runtime entrypoint — the deployable unit for the
-hackathon target architecture (design spec §8's "brain").
+"brain" half of the architecture (see README "Architecture").
 
 This is intentionally the *only* file in the codebase that imports the
 `bedrock_agentcore` SDK, so nothing else — the gateway, the tools, the test
@@ -10,9 +10,9 @@ today, and will call this deployed endpoint instead once it's live).
 
 Install the extra before deploying:
     pip install -e ".[agentcore]"
-(package name/version not yet verified against a real deploy — confirm
-against AWS's current docs at deploy time, per design spec §8's own note
-that this tooling moves fast.)
+(verified against a real deploy — see README "Status" — but this tooling
+moves fast, so double-check package name/version against AWS's current docs
+if it's been a while.)
 
 Deploy with the AgentCore CLI/toolkit current at deploy time — not run here.
 """

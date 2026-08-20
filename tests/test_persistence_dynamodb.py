@@ -1,7 +1,6 @@
 """Tests for DynamoDBTaskStoreBackend against a mocked DynamoDB (moto) — no
 real AWS account or credentials needed. Mirrors test_task_store.py's SQLite
-coverage so both backends are held to the same behavioral contract (design
-spec §8).
+coverage so both backends are held to the same behavioral contract.
 """
 
 from __future__ import annotations

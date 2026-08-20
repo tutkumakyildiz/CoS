@@ -2,13 +2,14 @@
 
 Household chief-of-staff Telegram bot, built on the [Strands Agents SDK](https://strandsagents.com/). It lives in a shared household group chat, turns loose mentions ("we need to book Mia's dentist appointment") into tracked tasks, asks who's taking each one, follows up so nothing falls through the cracks, and gives a neutral weekly picture of who's carrying what.
 
-See [`CoS-agent-design-spec.md`](CoS-agent-design-spec.md) for the full design rationale.
-
 ## Architecture
 
-![CoS agent-invocation path: today vs. hackathon target](docs/architecture.svg)
+![CoS architecture](docs/architecture.svg)
 
-*Today, the gateway calls a Strands Agent running in-process against the Anthropic API and local SQLite. The hackathon target keeps the same gateway, but routes that call through Amazon Bedrock AgentCore Runtime instead, backed by Amazon Bedrock and DynamoDB. See [`CoS-agent-design-spec.md`](CoS-agent-design-spec.md#8-hackathon-target-architecture-bedrock--agentcore) for the full rationale.*
+CoS splits into a **gateway** and a **brain**, because Amazon Bedrock AgentCore Runtime is a synchronous request/response HTTP service with no native support for a long-polling Telegram listener or scheduled background jobs:
+
+- **Gateway** (`telegram_bot/bot.py`) — a normal long-running process: the Telegram long-poll listener, plus the daily-nudge and weekly-metrics `JobQueue` schedulers. Unchanged regardless of which brain path is active.
+- **Brain** (`brain.py` / `agent.py`) — the actual Strands Agent and its tool-calling loop. By default it's invoked as a deployed **Bedrock AgentCore Runtime** endpoint (a container built from the root `Dockerfile`, running `runtime_entrypoint.py`, invoked per message via `invoke_agent_runtime`), backed by **Amazon Bedrock** (Claude) and **DynamoDB** (`cos_tasks` table). A local, in-process fallback path (direct Anthropic API + SQLite, no AgentCore round-trip) stays available behind config flags — see "Model provider" and "Gateway/brain mode" below.
 
 ## Features
 
@@ -24,34 +25,36 @@ See [`CoS-agent-design-spec.md`](CoS-agent-design-spec.md) for the full design r
 
 Core MVP is built and live-tested end-to-end in a real household group: capture, delegation, both completion paths, daily nudges, weekly stats, and the reply safety net all work in production use today.
 
-Runs on **Amazon Bedrock** (Claude via `strands.models.bedrock.BedrockModel`, EU cross-region inference profile in `eu-central-1`), **DynamoDB** (`cos_tasks` table, `PAY_PER_REQUEST`), and **Bedrock AgentCore Runtime** (the "brain" — `runtime_entrypoint.py`, deployed as a container, invoked per-message via `invoke_agent_runtime`) as of the AWS Agents for Humans Hackathon build — see "Model provider" and "Gateway/brain mode" below. The direct-Anthropic-API, SQLite, and in-process-agent paths are all kept as fallbacks (`COS_MODEL_PROVIDER=anthropic`, `COS_PERSISTENCE_BACKEND=sqlite`, `COS_AGENT_MODE=local`). Real household task data was migrated from the original SQLite file into DynamoDB, not started fresh. Live-verified end-to-end through the deployed AgentCore Runtime: an inbound message, a button-tap callback, and a scheduled daily-nudge job all worked, including the reply-reliability safety net.
+Runs on **Amazon Bedrock** (Claude via `strands.models.bedrock.BedrockModel`, EU cross-region inference profile in `eu-central-1`), **DynamoDB** (`cos_tasks` table, `PAY_PER_REQUEST`), and **Bedrock AgentCore Runtime** (the "brain" — `runtime_entrypoint.py`, deployed as a container, invoked per-message via `invoke_agent_runtime`) — see "Model provider" and "Gateway/brain mode" below. The direct-Anthropic-API, SQLite, and in-process-agent paths are all kept as fallbacks (`COS_MODEL_PROVIDER=anthropic`, `COS_PERSISTENCE_BACKEND=sqlite`, `COS_AGENT_MODE=local`). Real household task data was migrated from the original SQLite file into DynamoDB, not started fresh. Live-verified end-to-end through the deployed AgentCore Runtime: an inbound message, a button-tap callback, and a scheduled daily-nudge job all worked, including the reply-reliability safety net.
 
-**Not yet built:** nothing outstanding from the hackathon's technical build — remaining work is submission packaging (Phase D/E: demo household, sanitization, video, Devpost text).
+**Not yet built:** nothing outstanding on the technical side — see "Next up" below for what's next in scope.
 
 ## Model provider
 
 Set `COS_MODEL_PROVIDER` in `.env`:
 - `bedrock` (current default in this repo's own `.env`) — Amazon Bedrock. Needs `COS_AWS_REGION` and a Bedrock-shaped `COS_MODEL_ID` (an inference profile id in regions like `eu-central-1`, e.g. `eu.anthropic.claude-haiku-4-5-20251001-v1:0` — find yours with `aws bedrock list-inference-profiles --region <region>`). Optional `COS_AWS_PROFILE` for a named local AWS CLI profile.
-- `anthropic` — direct Anthropic API (original Week-1 path). Needs `ANTHROPIC_API_KEY` and a bare model name in `COS_MODEL_ID` (e.g. `claude-haiku-4-5`).
+- `anthropic` — direct Anthropic API (fallback path). Needs `ANTHROPIC_API_KEY` and a bare model name in `COS_MODEL_ID` (e.g. `claude-haiku-4-5`).
 
 ## Gateway/brain mode
 
 Set `COS_AGENT_MODE` in `.env`:
-- `local` — the Telegram gateway (`bot.py`) runs the Strands Agent in-process, same as before the hackathon's gateway/brain split.
+- `local` — the Telegram gateway (`bot.py`) runs the Strands Agent in-process, no AgentCore round-trip.
 - `agentcore` (current default in this repo's own `.env`) — the gateway instead fires each instruction at a deployed Bedrock AgentCore Runtime endpoint (`COS_AGENTCORE_RUNTIME_ARN`, required in this mode) via `invoke_agent_runtime`. The deployed container (built from the root `Dockerfile`, running `runtime_entrypoint.py`) sends the Telegram reply itself, as a side effect — the local gateway process never touches the model or the reply in this mode.
 
 Deploying/updating the container: build for `linux/arm64` (`docker buildx build --platform linux/arm64 -t cos-agentcore-brain .`), push to the ECR repo, then call `bedrock-agentcore-control`'s `update-agent-runtime` (or `create-agent-runtime` for a first deploy) with the new image URI. Note: AgentCore pins existing sessions to their already-warm container instance — an in-flight `runtimeSessionId` may keep hitting the pre-update container until it recycles, so a fresh session (or waiting it out) is needed to exercise a just-deployed change.
 
 See `.env.example` for the full set of variables.
 
-## Design deviations from the spec
+## Design decisions worth knowing
 
-| Spec called for | Built instead | Why |
+Places the implementation deliberately diverges from the "obvious" approach:
+
+| Instead of | CoS does | Why |
 |---|---|---|
-| Community `strands-telegram` / `strands-telegram-listener` packages | `python-telegram-bot`, wrapped in custom Strands tools | Spec itself flagged those packages as unreviewed. |
-| Google Sheets persistence | SQLite | Kept permanently by design choice — no GCP dependency. |
+| Community `strands-telegram` / `strands-telegram-listener` packages | `python-telegram-bot`, wrapped in custom Strands tools | Those community packages are unreviewed/unmaintained-risk. |
+| Google Sheets persistence | SQLite (local) / DynamoDB (deployed) | Kept permanently by design choice — no GCP dependency. |
 | Private DM nudges | Nudges posted in the shared group chat, addressed to the owner by name | Avoids requiring each partner to `/start` the bot privately before it can message them. |
-| Weekly digest with an imbalance callout | Neutral weekly stats summary, no praise/blame | Narrower, purpose-built replacement — partners can still ask about open tasks any time via on-demand queries. |
+| A weekly digest with an imbalance callout | A neutral weekly stats summary, no praise/blame | Narrower, purpose-built replacement — partners can still ask about open tasks any time via on-demand queries. |
 | Google Calendar integration | Permanent no-op stub (`calendar_tool.py` always reports "not connected") | Kept permanently by design choice — not planned. |
 
 ## Setup
@@ -122,27 +125,38 @@ Runs against a throwaway SQLite db — no Telegram or Anthropic credentials need
 
 ```
 src/cos/
-  config.py             # env + household.json loading
-  db.py                 # SQLite schema (tasks)
-  agent.py              # builds the Strands Agent, per chat_id
-  prompts.py            # system prompt + household context
-  response_tracker.py   # detects "ran a tool but never replied", triggers a retry
-  main.py                # entry point
+  config.py                       # env + household.json loading
+  db.py                           # SQLite connection/schema setup
+  agent.py                        # builds the Strands Agent, per chat_id
+  brain.py                        # agent-invocation dispatch: local in-process vs. AgentCore Runtime
+  runtime_entrypoint.py           # BedrockAgentCoreApp adapter — the deployed container's entrypoint
+  prompts.py                      # system prompt + household context
+  response_tracker.py             # detects "ran a tool but never replied", triggers a retry
+  main.py                         # entry point
+  persistence/
+    base.py                       # TaskStoreBackend interface
+    sqlite_backend.py             # local dev backend
+    dynamodb_backend.py           # deployed backend
   tools/
-    task_store.py        # create/update/query tasks, weekly metrics
-    telegram_tools.py     # send_message, ask_choice
-    calendar_tool.py      # permanent no-op stub — see "Design deviations"
+    task_store.py                 # create/update/query tasks, weekly metrics
+    telegram_tools.py             # send_message, ask_choice
+    calendar_tool.py              # permanent no-op stub — see "Design decisions"
   telegram_bot/
-    bot.py                # long-poll listener, callback routing, scheduled jobs
+    bot.py                        # long-poll listener, callback routing, scheduled jobs
 tests/
   test_task_store.py
   test_bot.py
+  test_brain.py
   test_db.py
+  test_persistence_dynamodb.py
   test_response_tracker.py
+deploy/iam/                       # reference IAM policy templates for the AgentCore execution role
+docs/
+  architecture.svg                # diagram referenced above
 ```
 
 ## Next up
 
-- Hackathon submission packaging: demo household, repo sanitization, video, Devpost text (see the hackathon plan doc — not part of this repo).
+Broader household support past two partners, and DM-based nudges as an opt-in alongside the group-chat nudges CoS uses today.
 
-Permanently out of scope for this MVP (see "Design deviations" above): private DM nudges, Google Sheets migration, weekly digest generator, Google Calendar integration.
+Permanently out of scope for this MVP (see "Design decisions worth knowing" above): Google Sheets persistence, a blame-y weekly digest, and real Google Calendar integration (`calendar_tool.py` stays a permanent no-op stub by design).

@@ -1,6 +1,6 @@
-"""SQLite persistence — spec §3/§8 called for Google Sheets, but SQLite is
-the permanent choice for this project (decided 2026-08-18, see README
-"Design deviations"), not a temporary stand-in.
+"""SQLite persistence — the local/dev backend (see README "Design decisions
+worth knowing"); the deployed path uses DynamoDB instead (see
+persistence/dynamodb_backend.py).
 """
 
 from __future__ import annotations

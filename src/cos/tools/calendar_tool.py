@@ -1,10 +1,10 @@
-"""`calendar_tool` — spec §4.2. Permanent no-op stub (see README "Design
-deviations") — real Google Calendar integration was cut from scope entirely,
-not deferred.
+"""`calendar_tool` — permanent no-op stub (see README "Design decisions
+worth knowing") — real Google Calendar integration was cut from scope
+entirely, not deferred.
 
-The system prompt (spec §5) tells the agent to consult this for seasonal/
-recurring tasks, so it needs to exist and answer *something* sane rather than
-fail as an unknown tool — it always reports "not connected", permanently.
+The system prompt tells the agent to consult this for seasonal/recurring
+tasks, so it needs to exist and answer *something* sane rather than fail as
+an unknown tool — it always reports "not connected", permanently.
 """
 
 from __future__ import annotations

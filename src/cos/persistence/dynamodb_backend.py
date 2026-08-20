@@ -1,7 +1,7 @@
-"""DynamoDB implementation of TaskStoreBackend — the hackathon/AgentCore
-target persistence (design spec §8). AgentCore Runtime containers are
-ephemeral, so the SQLite file the local/dev path uses isn't reachable from
-inside one; this replaces it with a network-reachable, serverless table.
+"""DynamoDB implementation of TaskStoreBackend — the deployed path's
+persistence. AgentCore Runtime containers are ephemeral, so the SQLite file
+the local/dev path uses isn't reachable from inside one; this replaces it
+with a network-reachable, serverless table.
 
 Table layout: partition key `chat_id`, sort key `task_id`. Every query this
 backend needs (open tasks, overdue, due-soon, weekly metrics) is scoped to
@@ -13,8 +13,8 @@ outgrows that, a GSI on (chat_id, status) or (chat_id, due_date) is the next
 step — not needed for an MVP household.
 
 Tested against a mocked table (moto — see tests/test_persistence_dynamodb.py),
-no real AWS account needed. Not exercised against a real table yet; that
-happens once AWS access is available (design spec §8 build order).
+no real AWS account needed. Also live-verified against a real deployed
+table (see README "Status").
 """
 
 from __future__ import annotations

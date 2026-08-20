@@ -1,8 +1,8 @@
-"""SQLite implementation of TaskStoreBackend — today's default persistence.
+"""SQLite implementation of TaskStoreBackend — the local/dev persistence.
 
 Moved here unchanged from task_store.py during the backend-abstraction
-refactor (design spec §8): same SQL, same behavior, just behind the
-TaskStoreBackend interface so task_store.py's tools don't touch SQL directly.
+refactor: same SQL, same behavior, just behind the TaskStoreBackend
+interface so task_store.py's tools don't touch SQL directly.
 """
 
 from __future__ import annotations
