@@ -1,6 +1,32 @@
-# CoS
+# CoS — Chief of Staff for Your Household
 
-Household chief-of-staff Telegram bot, built on the [Strands Agents SDK](https://strandsagents.com/). It lives in a shared household group chat, turns loose mentions ("we need to book Mia's dentist appointment") into tracked tasks, asks who's taking each one, follows up so nothing falls through the cracks, and gives a neutral weekly picture of who's carrying what.
+**Track:** Everyday Agents
+
+## What it does
+
+CoS is a Telegram bot that lives inside your household group chat and quietly manages the mental load of running a home — the invisible layer of remembering, assigning, and tracking chores, errands, and to-dos that usually falls disproportionately on one partner.
+
+Instead of a chore app nobody opens, CoS listens to the conversation you're already having. Mention something that needs doing — "we're out of milk," "someone needs to book the dentist" — and CoS captures it as a structured task automatically, no data entry required.
+
+From there, CoS handles the full lifecycle of a task:
+
+- **Delegation** — it asks who's taking ownership via inline buttons, or offers a "Split — let's talk" option when a task needs a real conversation instead of a snap assignment.
+- **Completion** — tasks close naturally, either by tapping "Done" on a reminder or just saying so in chat ("I bought milk").
+- **Daily nudges** — owners get reminded of what's due soon, posted publicly in the group and addressed to them by name, so accountability stays visible to everyone, not just the person nagging.
+- **On-demand queries** — anyone can ask CoS what's open right now ("what should I get from the market") and get a live answer.
+- **Weekly stats** — a neutral, factual summary of tasks captured and completed per partner, and how many were resolved without needing a reminder at all. No praise, no blame — just visibility.
+
+## Who it's for
+
+Couples and households who split responsibilities but keep running into the same argument: one person is doing all the remembering, even when chores are technically "shared." CoS is for any household — partners, roommates, or families — that wants task ownership to be explicit and measurable instead of assumed.
+
+## Why it matters
+
+Research on household labor consistently points to the mental load — the invisible work of noticing, planning, and tracking — as one of the most persistent drivers of inequity at home, separate from who does the physical task. CoS doesn't just split chores; it makes the invisible visible, turning "I told you to remember this" into a transparent, shared system that lives where the household already talks.
+
+## How it works
+
+CoS runs as an autonomous background agent built on the Strands Agents SDK and deployed on Amazon Bedrock AgentCore. It monitors the group chat continuously, uses natural-language understanding to detect actionable mentions, converts them into structured task objects, manages ownership state and reminder scheduling, and only surfaces to the group when a decision or nudge is actually needed — never as another app to check.
 
 ## Architecture
 
@@ -27,8 +53,6 @@ Core MVP is built and live-tested end-to-end in a real household group: capture,
 
 Runs on **Amazon Bedrock** (Claude via `strands.models.bedrock.BedrockModel`, EU cross-region inference profile in `eu-central-1`), **DynamoDB** (`cos_tasks` table, `PAY_PER_REQUEST`), and **Bedrock AgentCore Runtime** (the "brain" — `runtime_entrypoint.py`, deployed as a container, invoked per-message via `invoke_agent_runtime`) — see "Model provider" and "Gateway/brain mode" below. The direct-Anthropic-API, SQLite, and in-process-agent paths are all kept as fallbacks (`COS_MODEL_PROVIDER=anthropic`, `COS_PERSISTENCE_BACKEND=sqlite`, `COS_AGENT_MODE=local`). Real household task data was migrated from the original SQLite file into DynamoDB, not started fresh. Live-verified end-to-end through the deployed AgentCore Runtime: an inbound message, a button-tap callback, and a scheduled daily-nudge job all worked, including the reply-reliability safety net.
 
-**Not yet built:** nothing outstanding on the technical side — see "Next up" below for what's next in scope.
-
 ## Model provider
 
 Set `COS_MODEL_PROVIDER` in `.env`:
@@ -44,18 +68,6 @@ Set `COS_AGENT_MODE` in `.env`:
 Deploying/updating the container: build for `linux/arm64` (`docker buildx build --platform linux/arm64 -t cos-agentcore-brain .`), push to the ECR repo, then call `bedrock-agentcore-control`'s `update-agent-runtime` (or `create-agent-runtime` for a first deploy) with the new image URI. Note: AgentCore pins existing sessions to their already-warm container instance — an in-flight `runtimeSessionId` may keep hitting the pre-update container until it recycles, so a fresh session (or waiting it out) is needed to exercise a just-deployed change.
 
 See `.env.example` for the full set of variables.
-
-## Design decisions worth knowing
-
-Places the implementation deliberately diverges from the "obvious" approach:
-
-| Instead of | CoS does | Why |
-|---|---|---|
-| Community `strands-telegram` / `strands-telegram-listener` packages | `python-telegram-bot`, wrapped in custom Strands tools | Those community packages are unreviewed/unmaintained-risk. |
-| Google Sheets persistence | SQLite (local) / DynamoDB (deployed) | Kept permanently by design choice — no GCP dependency. |
-| Private DM nudges | Nudges posted in the shared group chat, addressed to the owner by name | Avoids requiring each partner to `/start` the bot privately before it can message them. |
-| A weekly digest with an imbalance callout | A neutral weekly stats summary, no praise/blame | Narrower, purpose-built replacement — partners can still ask about open tasks any time via on-demand queries. |
-| Google Calendar integration | Permanent no-op stub (`calendar_tool.py` always reports "not connected") | Kept permanently by design choice — not planned. |
 
 ## Setup
 
@@ -140,7 +152,6 @@ src/cos/
   tools/
     task_store.py                 # create/update/query tasks, weekly metrics
     telegram_tools.py             # send_message, ask_choice
-    calendar_tool.py              # permanent no-op stub — see "Design decisions"
   telegram_bot/
     bot.py                        # long-poll listener, callback routing, scheduled jobs
 tests/
@@ -157,6 +168,4 @@ docs/
 
 ## Next up
 
-Broader household support past two partners, and DM-based nudges as an opt-in alongside the group-chat nudges CoS uses today.
-
-Permanently out of scope for this MVP (see "Design decisions worth knowing" above): Google Sheets persistence, a blame-y weekly digest, and real Google Calendar integration (`calendar_tool.py` stays a permanent no-op stub by design).
+Broader household support past two partners.
