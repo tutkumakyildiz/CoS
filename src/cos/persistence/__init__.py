@@ -30,7 +30,9 @@ def get_backend(settings: Settings) -> TaskStoreBackend:
         from cos.persistence.dynamodb_backend import DynamoDBTaskStoreBackend
 
         backend = DynamoDBTaskStoreBackend(
-            table_name=settings.dynamodb_table_name, region_name=settings.aws_region
+            table_name=settings.dynamodb_table_name,
+            region_name=settings.aws_region,
+            profile_name=settings.aws_profile,
         )
     else:
         raise ValueError(f"Unknown COS_PERSISTENCE_BACKEND: {key!r} (expected 'sqlite' or 'dynamodb')")

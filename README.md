@@ -24,17 +24,35 @@ See [`CoS-agent-design-spec.md`](CoS-agent-design-spec.md) for the full design r
 
 Core MVP is built and live-tested end-to-end in a real household group: capture, delegation, both completion paths, daily nudges, weekly stats, and the reply safety net all work in production use today.
 
-**Not yet built:** real Google Calendar integration (`calendar_tool.py` is currently a stub that always reports "not connected") — the one remaining item from the original design spec's build order.
+Runs on **Amazon Bedrock** (Claude via `strands.models.bedrock.BedrockModel`, EU cross-region inference profile in `eu-central-1`), **DynamoDB** (`cos_tasks` table, `PAY_PER_REQUEST`), and **Bedrock AgentCore Runtime** (the "brain" — `runtime_entrypoint.py`, deployed as a container, invoked per-message via `invoke_agent_runtime`) as of the AWS Agents for Humans Hackathon build — see "Model provider" and "Gateway/brain mode" below. The direct-Anthropic-API, SQLite, and in-process-agent paths are all kept as fallbacks (`COS_MODEL_PROVIDER=anthropic`, `COS_PERSISTENCE_BACKEND=sqlite`, `COS_AGENT_MODE=local`). Real household task data was migrated from the original SQLite file into DynamoDB, not started fresh. Live-verified end-to-end through the deployed AgentCore Runtime: an inbound message, a button-tap callback, and a scheduled daily-nudge job all worked, including the reply-reliability safety net.
+
+**Not yet built:** nothing outstanding from the hackathon's technical build — remaining work is submission packaging (Phase D/E: demo household, sanitization, video, Devpost text).
+
+## Model provider
+
+Set `COS_MODEL_PROVIDER` in `.env`:
+- `bedrock` (current default in this repo's own `.env`) — Amazon Bedrock. Needs `COS_AWS_REGION` and a Bedrock-shaped `COS_MODEL_ID` (an inference profile id in regions like `eu-central-1`, e.g. `eu.anthropic.claude-haiku-4-5-20251001-v1:0` — find yours with `aws bedrock list-inference-profiles --region <region>`). Optional `COS_AWS_PROFILE` for a named local AWS CLI profile.
+- `anthropic` — direct Anthropic API (original Week-1 path). Needs `ANTHROPIC_API_KEY` and a bare model name in `COS_MODEL_ID` (e.g. `claude-haiku-4-5`).
+
+## Gateway/brain mode
+
+Set `COS_AGENT_MODE` in `.env`:
+- `local` — the Telegram gateway (`bot.py`) runs the Strands Agent in-process, same as before the hackathon's gateway/brain split.
+- `agentcore` (current default in this repo's own `.env`) — the gateway instead fires each instruction at a deployed Bedrock AgentCore Runtime endpoint (`COS_AGENTCORE_RUNTIME_ARN`, required in this mode) via `invoke_agent_runtime`. The deployed container (built from the root `Dockerfile`, running `runtime_entrypoint.py`) sends the Telegram reply itself, as a side effect — the local gateway process never touches the model or the reply in this mode.
+
+Deploying/updating the container: build for `linux/arm64` (`docker buildx build --platform linux/arm64 -t cos-agentcore-brain .`), push to the ECR repo, then call `bedrock-agentcore-control`'s `update-agent-runtime` (or `create-agent-runtime` for a first deploy) with the new image URI. Note: AgentCore pins existing sessions to their already-warm container instance — an in-flight `runtimeSessionId` may keep hitting the pre-update container until it recycles, so a fresh session (or waiting it out) is needed to exercise a just-deployed change.
+
+See `.env.example` for the full set of variables.
 
 ## Design deviations from the spec
 
 | Spec called for | Built instead | Why |
 |---|---|---|
-| Claude via Amazon Bedrock | Claude via the Anthropic API directly (`strands.models.anthropic.AnthropicModel`) | No AWS/Bedrock access configured yet. Swapping is a small, isolated change in `agent.py` — Strands abstracts the model provider, nothing else changes. |
 | Community `strands-telegram` / `strands-telegram-listener` packages | `python-telegram-bot`, wrapped in custom Strands tools | Spec itself flagged those packages as unreviewed. |
 | Google Sheets persistence | SQLite | Kept permanently by design choice — no GCP dependency. |
 | Private DM nudges | Nudges posted in the shared group chat, addressed to the owner by name | Avoids requiring each partner to `/start` the bot privately before it can message them. |
 | Weekly digest with an imbalance callout | Neutral weekly stats summary, no praise/blame | Narrower, purpose-built replacement — partners can still ask about open tasks any time via on-demand queries. |
+| Google Calendar integration | Permanent no-op stub (`calendar_tool.py` always reports "not connected") | Kept permanently by design choice — not planned. |
 
 ## Setup
 
@@ -113,7 +131,7 @@ src/cos/
   tools/
     task_store.py        # create/update/query tasks, weekly metrics
     telegram_tools.py     # send_message, ask_choice
-    calendar_tool.py      # Google Calendar wrapper (stub)
+    calendar_tool.py      # permanent no-op stub — see "Design deviations"
   telegram_bot/
     bot.py                # long-poll listener, callback routing, scheduled jobs
 tests/
@@ -125,6 +143,6 @@ tests/
 
 ## Next up
 
-- Real Google Calendar wiring in `calendar_tool.py`.
+- Hackathon submission packaging: demo household, repo sanitization, video, Devpost text (see the hackathon plan doc — not part of this repo).
 
-Permanently out of scope for this MVP (see "Design deviations" above): private DM nudges, Google Sheets migration, weekly digest generator.
+Permanently out of scope for this MVP (see "Design deviations" above): private DM nudges, Google Sheets migration, weekly digest generator, Google Calendar integration.

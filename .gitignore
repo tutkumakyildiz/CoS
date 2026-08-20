@@ -8,6 +8,7 @@ data/*.db-wal
 data/*.db-shm
 data/*.log
 household.json
+deploy/*-request.json
 .DS_Store
 *.egg-info/
 .pytest_cache/

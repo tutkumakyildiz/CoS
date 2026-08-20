@@ -1,10 +1,10 @@
-"""`calendar_tool` — spec §4.2. Week 2 item; stubbed for Week 1.
+"""`calendar_tool` — spec §4.2. Permanent no-op stub (see README "Design
+deviations") — real Google Calendar integration was cut from scope entirely,
+not deferred.
 
 The system prompt (spec §5) tells the agent to consult this for seasonal/
 recurring tasks, so it needs to exist and answer *something* sane rather than
-fail as an unknown tool — it just always reports "not connected yet" for now.
-Swap the bodies below for a real Google Calendar API wrapper (or a community
-Strands tool, if one proves solid) without changing the tool names/signatures.
+fail as an unknown tool — it always reports "not connected", permanently.
 """
 
 from __future__ import annotations

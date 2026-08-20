@@ -1,0 +1,16 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Effect":"Allow","Action":["logs:DescribeLogStreams","logs:CreateLogGroup"],"Resource":["arn:aws:logs:eu-central-1:345896303484:log-group:/aws/bedrock-agentcore/runtimes/*"]},
+    {"Effect":"Allow","Action":["logs:PutResourcePolicy"],"Resource":["arn:aws:logs:eu-central-1:345896303484:log-group:/aws/bedrock-agentcore/runtimes/cos_brain-*"]},
+    {"Effect":"Allow","Action":["logs:DescribeLogGroups"],"Resource":["arn:aws:logs:eu-central-1:345896303484:log-group:*"]},
+    {"Effect":"Allow","Action":["logs:CreateLogStream","logs:PutLogEvents"],"Resource":["arn:aws:logs:eu-central-1:345896303484:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*"]},
+    {"Effect":"Allow","Action":["ecr:BatchGetImage","ecr:GetDownloadUrlForLayer"],"Resource":["arn:aws:ecr:eu-central-1:345896303484:repository/*"]},
+    {"Effect":"Allow","Action":["ecr:GetAuthorizationToken"],"Resource":"*"},
+    {"Effect":"Allow","Action":["xray:PutTraceSegments","xray:PutTelemetryRecords","xray:GetSamplingRules","xray:GetSamplingTargets"],"Resource":["*"]},
+    {"Effect":"Allow","Action":"cloudwatch:PutMetricData","Resource":"*","Condition":{"StringEquals":{"cloudwatch:namespace":"bedrock-agentcore"}}},
+    {"Sid":"GetAgentAccessToken","Effect":"Allow","Action":["bedrock-agentcore:GetWorkloadAccessToken","bedrock-agentcore:GetWorkloadAccessTokenForJWT"],"Resource":["arn:aws:bedrock-agentcore:eu-central-1:345896303484:workload-identity-directory/default","arn:aws:bedrock-agentcore:eu-central-1:345896303484:workload-identity-directory/default/workload-identity/cos_brain-*"]},
+    {"Sid":"BedrockModelInvocation","Effect":"Allow","Action":["bedrock:InvokeModel","bedrock:InvokeModelWithResponseStream"],"Resource":["arn:aws:bedrock:*::foundation-model/*","arn:aws:bedrock:eu-central-1:345896303484:*"]},
+    {"Sid":"TaskStoreDynamoDBAccess","Effect":"Allow","Action":["dynamodb:GetItem","dynamodb:PutItem","dynamodb:UpdateItem","dynamodb:Query"],"Resource":["arn:aws:dynamodb:eu-central-1:345896303484:table/cos_tasks"]}
+  ]
+}

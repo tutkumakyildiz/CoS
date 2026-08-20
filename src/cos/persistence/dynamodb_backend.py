@@ -60,8 +60,21 @@ def create_table_if_not_exists(resource: Any, table_name: str) -> Any:
 
 
 class DynamoDBTaskStoreBackend(TaskStoreBackend):
-    def __init__(self, table_name: str, region_name: str | None = None, resource: Any = None):
-        self._resource = resource or boto3.resource("dynamodb", region_name=region_name)
+    def __init__(
+        self,
+        table_name: str,
+        region_name: str | None = None,
+        profile_name: str | None = None,
+        resource: Any = None,
+    ):
+        if resource is not None:
+            self._resource = resource
+        else:
+            # Same profile-aware session pattern as agent.py's _build_model,
+            # so COS_AWS_PROFILE works consistently for both Bedrock and
+            # DynamoDB rather than silently only working for one of them.
+            session = boto3.Session(profile_name=profile_name, region_name=region_name)
+            self._resource = session.resource("dynamodb")
         self._table = self._resource.Table(table_name)
 
     def _query_chat(self, chat_id: str) -> list[dict[str, Any]]:

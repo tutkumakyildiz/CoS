@@ -8,8 +8,9 @@ CoS behavior lives in the system prompt + tools, not here.
 
 This is the "gateway" half of the hackathon target architecture (design spec
 §8) — it keeps this exact shape (long-polling + scheduling) whether the
-agent invocation behind it (cos.brain.run_instruction) runs in-process, as it
-does today, or against a deployed AgentCore Runtime endpoint later.
+agent invocation behind it (cos.brain.invoke_brain) runs in-process
+(COS_AGENT_MODE=local) or against a deployed AgentCore Runtime endpoint
+(COS_AGENT_MODE=agentcore).
 """
 
 from __future__ import annotations
@@ -20,7 +21,7 @@ from datetime import time
 from telegram import Update
 from telegram.ext import Application, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 
-from cos.brain import run_instruction, today_prefix
+from cos.brain import invoke_brain, today_prefix
 from cos.config import Settings
 
 logger = logging.getLogger("cos.bot")
@@ -37,7 +38,7 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, se
         f"{today_prefix()} Telegram message from {sender_name} (user id {user.id}): "
         f'"{message.text}"'
     )
-    await run_instruction(settings, context.bot, instruction, log_context=f"handling message: {message.text!r}")
+    await invoke_brain(settings, context.bot, instruction, log_context=f"handling message: {message.text!r}")
 
 
 async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, settings: Settings) -> None:
@@ -55,7 +56,7 @@ async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, s
         f'on task {task_id}: chose "{option}". Handle it (e.g. update ownership via '
         f"task_store) and confirm via send_message."
     )
-    await run_instruction(settings, context.bot, instruction, log_context=f"handling callback: {query.data!r}")
+    await invoke_brain(settings, context.bot, instruction, log_context=f"handling callback: {query.data!r}")
 
 
 async def _handle_daily_nudge_check(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -70,7 +71,7 @@ async def _handle_daily_nudge_check(context: ContextTypes.DEFAULT_TYPE) -> None:
         "update_task(last_nudge_at=now) for it. Don't nudge the same task twice "
         "in one day, and don't message about tasks that were already nudged today."
     )
-    await run_instruction(settings, context.bot, instruction, log_context="running daily nudge check")
+    await invoke_brain(settings, context.bot, instruction, log_context="running daily nudge check")
 
 
 async def _handle_weekly_metrics_check(context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -81,7 +82,7 @@ async def _handle_weekly_metrics_check(context: ContextTypes.DEFAULT_TYPE) -> No
         "the WEEKLY STATS behavior now: call get_weekly_metrics and post the summary "
         "via send_message."
     )
-    await run_instruction(settings, context.bot, instruction, log_context="running weekly metrics check")
+    await invoke_brain(settings, context.bot, instruction, log_context="running weekly metrics check")
 
 
 def build_application(settings: Settings) -> Application:
