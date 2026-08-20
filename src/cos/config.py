@@ -32,7 +32,6 @@ class HouseholdConfig:
 @dataclass(frozen=True)
 class Settings:
     telegram_bot_token: str
-    anthropic_api_key: str
     model_id: str
     db_path: Path
     household: HouseholdConfig
@@ -41,12 +40,32 @@ class Settings:
     metrics_hour: int
     metrics_minute: int
     metrics_weekday: int  # python-telegram-bot JobQueue convention: 0=Sunday..6=Saturday
-    # Hackathon/AgentCore target (design spec §8) — inert defaults today.
-    # "sqlite" is the only backend actually exercised outside tests until AWS
-    # access is available; "dynamodb" is built and covered by moto tests.
+    # Model provider (design spec §8 / hackathon Phase B). "anthropic" (default)
+    # is the original Week-1 direct-API path; "bedrock" routes through Amazon
+    # Bedrock instead. anthropic_api_key is only required for "anthropic".
+    model_provider: str = "anthropic"
+    anthropic_api_key: str | None = None
+    # Hackathon/AgentCore target (design spec §8).
+    # persistence_backend: "sqlite" (default, Week-1) or "dynamodb" (AWS-backed,
+    # covered by moto tests, now runnable for real once aws_region is set).
     persistence_backend: str = "sqlite"
     dynamodb_table_name: str = "cos_tasks"
+    # AWS region, shared by both the Bedrock model calls and the DynamoDB
+    # backend — e.g. "eu-central-1". Required when model_provider=bedrock or
+    # persistence_backend=dynamodb.
     aws_region: str | None = None
+    # Optional named AWS CLI profile (COS_AWS_PROFILE) to use instead of the
+    # default credential chain — handy for local dev with `aws configure
+    # --profile <name>`. Leave unset in production (e.g. AgentCore's IAM role).
+    aws_profile: str | None = None
+    # Gateway/brain split (design spec §8, hackathon Phase C). "local"
+    # (default) runs the Strands Agent in-process, same as before the split.
+    # "agentcore" instead fires each instruction at a deployed Bedrock
+    # AgentCore Runtime endpoint (agentcore_runtime_arn, required in that
+    # mode) via invoke_agent_runtime — the deployed container sends the
+    # Telegram reply itself, as a side effect, same as the local path does.
+    agent_mode: str = "local"
+    agentcore_runtime_arn: str | None = None
 
 
 def _load_household(path: Path) -> HouseholdConfig:
@@ -89,9 +108,25 @@ def load_settings() -> Settings:
         db_path = REPO_ROOT / db_path
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
+    model_provider = os.environ.get("COS_MODEL_PROVIDER", "anthropic").strip().lower()
+    if model_provider not in ("anthropic", "bedrock"):
+        raise RuntimeError(f"COS_MODEL_PROVIDER must be 'anthropic' or 'bedrock', got: {model_provider!r}")
+
+    aws_region = os.environ.get("COS_AWS_REGION") or None
+    if model_provider == "bedrock" and not aws_region:
+        raise RuntimeError(
+            "COS_MODEL_PROVIDER=bedrock requires COS_AWS_REGION to be set (e.g. eu-central-1)."
+        )
+
+    agent_mode = os.environ.get("COS_AGENT_MODE", "local").strip().lower()
+    if agent_mode not in ("local", "agentcore"):
+        raise RuntimeError(f"COS_AGENT_MODE must be 'local' or 'agentcore', got: {agent_mode!r}")
+    agentcore_runtime_arn = os.environ.get("COS_AGENTCORE_RUNTIME_ARN") or None
+    if agent_mode == "agentcore" and not agentcore_runtime_arn:
+        raise RuntimeError("COS_AGENT_MODE=agentcore requires COS_AGENTCORE_RUNTIME_ARN to be set.")
+
     return Settings(
         telegram_bot_token=require("TELEGRAM_BOT_TOKEN"),
-        anthropic_api_key=require("ANTHROPIC_API_KEY"),
         model_id=os.environ.get("COS_MODEL_ID", "claude-haiku-4-5"),
         db_path=db_path,
         household=_load_household(household_path),
@@ -100,7 +135,12 @@ def load_settings() -> Settings:
         metrics_hour=int(os.environ.get("COS_METRICS_HOUR", "10")),
         metrics_minute=int(os.environ.get("COS_METRICS_MINUTE", "0")),
         metrics_weekday=int(os.environ.get("COS_METRICS_WEEKDAY", "0")),
+        model_provider=model_provider,
+        anthropic_api_key=(require("ANTHROPIC_API_KEY") if model_provider == "anthropic" else os.environ.get("ANTHROPIC_API_KEY") or None),
         persistence_backend=os.environ.get("COS_PERSISTENCE_BACKEND", "sqlite"),
         dynamodb_table_name=os.environ.get("COS_DYNAMODB_TABLE", "cos_tasks"),
-        aws_region=os.environ.get("COS_AWS_REGION") or None,
+        aws_region=aws_region,
+        aws_profile=os.environ.get("COS_AWS_PROFILE") or None,
+        agent_mode=agent_mode,
+        agentcore_runtime_arn=agentcore_runtime_arn,
     )

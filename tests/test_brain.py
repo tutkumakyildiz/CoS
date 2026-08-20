@@ -121,3 +121,76 @@ def test_handle_payload_defaults_log_context_when_omitted(settings, monkeypatch)
 
 def test_today_prefix_contains_iso_date():
     assert re.search(r"\d{4}-\d{2}-\d{2}", brain.today_prefix())
+
+
+def test_invoke_brain_calls_run_instruction_in_local_mode(settings, monkeypatch):
+    # settings fixture defaults to agent_mode="local" — invoke_brain should
+    # behave exactly like calling run_instruction directly.
+    calls = []
+    monkeypatch.setattr(
+        brain, "run_instruction", lambda s, bot, instr, *, log_context: calls.append((instr, log_context)) or _noop()
+    )
+
+    asyncio.run(brain.invoke_brain(settings, bot=None, instruction="do something", log_context="test"))
+
+    assert calls == [("do something", "test")]
+
+
+def test_invoke_brain_calls_invoke_remote_in_agentcore_mode(settings, monkeypatch):
+    agentcore_settings = _with_agentcore_mode(settings)
+    calls = []
+    monkeypatch.setattr(
+        brain, "invoke_remote", lambda s, instr, *, log_context: calls.append((instr, log_context)) or _noop()
+    )
+
+    asyncio.run(brain.invoke_brain(agentcore_settings, bot=None, instruction="do something", log_context="test"))
+
+    assert calls == [("do something", "test")]
+
+
+def test_invoke_remote_calls_invoke_agent_runtime_with_expected_payload(settings, monkeypatch):
+    import json
+
+    agentcore_settings = _with_agentcore_mode(settings)
+    captured = {}
+
+    class _FakeStream:
+        def read(self):
+            return b'{"status": "ok"}'
+
+    class _FakeClient:
+        def invoke_agent_runtime(self, **kwargs):
+            captured.update(kwargs)
+            return {"response": _FakeStream()}
+
+    class _FakeSession:
+        def __init__(self, profile_name=None, region_name=None):
+            captured["profile_name"] = profile_name
+            captured["region_name"] = region_name
+
+        def client(self, name):
+            captured["client_name"] = name
+            return _FakeClient()
+
+    monkeypatch.setattr(brain.boto3, "Session", _FakeSession)
+
+    asyncio.run(brain.invoke_remote(agentcore_settings, "do something", log_context="test"))
+
+    assert captured["client_name"] == "bedrock-agentcore"
+    assert captured["agentRuntimeArn"] == agentcore_settings.agentcore_runtime_arn
+    assert captured["runtimeSessionId"].startswith(f"cos-chat-{agentcore_settings.household.chat_id}")
+    assert json.loads(captured["payload"]) == {"instruction": "do something", "log_context": "test"}
+
+
+def _with_agentcore_mode(settings: Settings) -> Settings:
+    from dataclasses import replace
+
+    return replace(
+        settings,
+        agent_mode="agentcore",
+        agentcore_runtime_arn="arn:aws:bedrock-agentcore:eu-central-1:123456789012:runtime/cos_brain-fake",
+    )
+
+
+async def _noop() -> None:
+    return None

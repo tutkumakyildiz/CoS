@@ -1,0 +1,14 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PassAgentCoreExecutionRoleOnly",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::123456789012:role/cos-agentcore-execution-role",
+      "Condition": {
+        "StringEquals": { "iam:PassedToService": "bedrock-agentcore.amazonaws.com" }
+      }
+    }
+  ]
+}
