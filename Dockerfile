@@ -1,14 +1,19 @@
-# AgentCore Runtime deployable image — the "brain" half of the hackathon
-# gateway/brain split (design spec §8). This packages src/cos/runtime_entrypoint.py,
+# AgentCore Runtime deployable image — the "brain" half of the gateway/brain
+# split (see README "Architecture"). This packages src/cos/runtime_entrypoint.py,
 # the BedrockAgentCoreApp/@app.entrypoint adapter around cos.brain.handle_payload.
 #
 # AgentCore Runtime requires linux/arm64 images. Build with:
 #   docker buildx build --platform linux/arm64 -t cos-agentcore-brain .
 #
 # Secrets (TELEGRAM_BOT_TOKEN, model/AWS config) are NOT baked in here — they're
-# passed via AgentCore's environmentVariables at deploy time (see docs/deploy notes).
-# household.json is baked in (not a secret, just chat/user id mappings) since
-# config.py reads it from a file path, not an env var.
+# passed via AgentCore's environmentVariables at deploy time.
+#
+# household.json IS baked in, since config.py reads it from a file path, not
+# an env var. It's not a credential, but it does contain real personal data
+# once filled in (a real Telegram group chat_id, and partners' real Telegram
+# user ids + display names) — treat a built image the same as that file:
+# fine to push to a private ECR repo for your own AgentCore deploy, but never
+# push it to a public registry (Docker Hub, a public ECR repo, etc.).
 
 FROM --platform=linux/arm64 python:3.13-slim
 
