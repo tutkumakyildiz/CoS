@@ -1,8 +1,7 @@
-"""Persistence backend selection — design spec §8: the hackathon/AgentCore
-target needs DynamoDB instead of local SQLite, since AgentCore's containers
-are ephemeral. `get_backend` picks the implementation from Settings;
-task_store.py's tools only ever see `TaskStoreBackend`, never raw SQL or
-DynamoDB calls.
+"""Persistence backend selection. The deployed path needs DynamoDB instead
+of local SQLite, since AgentCore Runtime containers are ephemeral.
+`get_backend` picks the implementation from Settings; task_store.py's tools
+only ever see `TaskStoreBackend`, never raw SQL or DynamoDB calls.
 """
 
 from __future__ import annotations

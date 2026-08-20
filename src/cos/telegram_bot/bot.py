@@ -1,14 +1,14 @@
-"""Telegram listener + callback routing — spec §4.4/§4.5 and §6 "Capture flow".
+"""Telegram listener + callback routing.
 
 Built on python-telegram-bot's long-polling Application instead of the
-community `strands-telegram-listener` package (see README "Design
-deviations"). Its only job is: get messages and button taps in front of the
-agent, and get the agent's tool-driven replies out to Telegram. All actual
-CoS behavior lives in the system prompt + tools, not here.
+community `strands-telegram-listener` package (see README "Design decisions
+worth knowing"). Its only job is: get messages and button taps in front of
+the agent, and get the agent's tool-driven replies out to Telegram. All
+actual CoS behavior lives in the system prompt + tools, not here.
 
-This is the "gateway" half of the hackathon target architecture (design spec
-§8) — it keeps this exact shape (long-polling + scheduling) whether the
-agent invocation behind it (cos.brain.invoke_brain) runs in-process
+This is the "gateway" half of the architecture (see README "Architecture")
+— it keeps this exact shape (long-polling + scheduling) whether the agent
+invocation behind it (cos.brain.invoke_brain) runs in-process
 (COS_AGENT_MODE=local) or against a deployed AgentCore Runtime endpoint
 (COS_AGENT_MODE=agentcore).
 """

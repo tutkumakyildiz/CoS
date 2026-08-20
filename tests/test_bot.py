@@ -2,8 +2,8 @@
 needed, since Application.builder().build() doesn't make network calls.
 
 Retry-on-silent-drop logic used to live here too; it moved to test_brain.py
-along with the code it tests (cos.brain.run_instruction) — see design spec
-§8's brain/gateway split.
+along with the code it tests (cos.brain.run_instruction) when that logic
+was split out of bot.py into brain.py.
 """
 
 from __future__ import annotations

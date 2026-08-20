@@ -1,10 +1,15 @@
-"""Builds the single Strands Agent — spec §2 ("Why single-agent for MVP").
+"""Builds the single Strands Agent.
+
+One agent handles everything — capture, delegation, follow-up, weekly
+stats — through a small, well-scoped toolset and a single system prompt,
+rather than splitting into multiple specialized agents. Simpler to reason
+about and debug, and sufficient for a single-household MVP.
 
 One long-lived Agent instance per chat_id, reused across messages so the
 conversation_manager keeps recent context (e.g. a button tap referring back
-to a task mentioned a few messages ago). MVP is one household/one chat, but
-this is already chat_id-keyed since the data model is (spec §3: "multi-
-household ready later").
+to a task mentioned a few messages ago). Only one household/chat is in use
+today, but keying by chat_id from the start keeps multi-household support a
+config change away rather than a rearchitecture.
 """
 
 from __future__ import annotations
@@ -30,11 +35,11 @@ _trackers: dict[str, ResponseTracker] = {}
 
 
 def _build_model(settings: Settings) -> AnthropicModel | BedrockModel:
-    """Model provider swap point (design spec §8 / hackathon Phase B).
+    """Model provider swap point — see README "Model provider".
 
-    "anthropic" (default) calls the Anthropic API directly, unchanged from
-    Week 1. "bedrock" routes the same Agent through Amazon Bedrock instead —
-    note COS_MODEL_ID needs a Bedrock-shaped id for that provider (e.g. an EU
+    "anthropic" calls the Anthropic API directly. "bedrock" routes the same
+    Agent through Amazon Bedrock instead — note COS_MODEL_ID needs a
+    Bedrock-shaped id for that provider (e.g. an EU
     cross-region inference profile like
     "eu.anthropic.claude-haiku-4-5-20251001-v1:0"), not the bare Anthropic
     model name used by the "anthropic" provider.

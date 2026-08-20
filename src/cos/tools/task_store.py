@@ -1,20 +1,18 @@
-"""`task_store` tool — spec §4.1.
+"""`task_store` tool.
 
 Implemented as several small single-purpose Strands tools rather than one
 dispatch-by-action tool, since that's the more idiomatic shape for a Strands
-agent's tool-calling (each action gets its own name + schema) while keeping
-the same action set the spec defines.
+agent's tool-calling — each action gets its own name + schema.
 
 Each tool is bound to a single `chat_id` at construction time via
 `build_task_store_tools`, so the agent can never accidentally read or write
-another chat's tasks (spec §8 constraint: "Only act on tasks in this chat's
-own task list") — that's enforced in code, not just the prompt.
+another chat's tasks ("only act on tasks in this chat's own task list") —
+that's enforced in code, not just the prompt.
 
-Persistence lives behind `cos.persistence.TaskStoreBackend` (design spec §8)
-— SQLite by default (today), swappable to DynamoDB for the hackathon/
-AgentCore target via `COS_PERSISTENCE_BACKEND`. These tool functions only
-validate input and shape the response; they never touch SQL or DynamoDB
-directly.
+Persistence lives behind `cos.persistence.TaskStoreBackend` — SQLite for
+local dev, swappable to DynamoDB for the deployed path via
+`COS_PERSISTENCE_BACKEND`. These tool functions only validate input and
+shape the response; they never touch SQL or DynamoDB directly.
 """
 
 from __future__ import annotations
@@ -35,11 +33,10 @@ def build_task_store_tools(chat_id: str, backend: TaskStoreBackend | None = None
 
     Args:
         chat_id: The chat this tool set is scoped to (enforced here, not just
-            in the prompt — spec §8 constraint).
+            in the prompt).
         backend: Persistence backend to use. Defaults to a fresh SQLite
-            backend (today's behavior) if not given — pass a DynamoDB
-            backend (via `cos.persistence.get_backend`) for the hackathon/
-            AgentCore path.
+            backend (local dev) if not given — pass a DynamoDB backend
+            (via `cos.persistence.get_backend`) for the deployed path.
     """
     backend = backend or SqliteTaskStoreBackend()
 
@@ -149,8 +146,8 @@ def build_task_store_tools(chat_id: str, backend: TaskStoreBackend | None = None
     @tool
     def get_weekly_metrics(days: int = 7) -> dict[str, Any]:
         """Basic usage metrics for this chat over the last `days` days, for the
-        weekly stats summary — spec §7 "basic metrics logging". Percentages are
-        computed here (not left to the model) to avoid arithmetic mistakes.
+        weekly stats summary. Percentages are computed here (not left to the
+        model) to avoid arithmetic mistakes.
 
         Args:
             days: How many days back to look. Defaults to 7 (one week).

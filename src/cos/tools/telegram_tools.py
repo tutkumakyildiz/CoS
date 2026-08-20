@@ -1,13 +1,13 @@
-"""Outbound Telegram actions the agent can take — spec §4.4 (`strands-telegram`).
+"""Outbound Telegram actions the agent can take.
 
 Built directly on python-telegram-bot rather than the community
-`strands-telegram` package (see README "Design deviations"). Bound to a
-single bot + chat_id at construction time, same reasoning as task_store:
-the agent should never need to (and never be able to) target a chat_id
-other than the one it's running for.
+`strands-telegram` package (see README "Design decisions worth knowing").
+Bound to a single bot + chat_id at construction time, same reasoning as
+task_store: the agent should never need to (and never be able to) target a
+chat_id other than the one it's running for.
 
 Two tools, matching the two shapes of outbound message the system prompt
-(spec §5) actually needs:
+actually needs:
 - send_message: plain text (confirmations, nudges, query replies)
 - ask_choice: text + inline keyboard buttons (ownership decisions), where each
   tapped button routes back into the agent via the bot's callback handler

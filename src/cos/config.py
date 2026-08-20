@@ -1,7 +1,8 @@
 """Environment + household configuration loading.
 
-Per the design spec §8: "Telegram user_id -> owner mapping should be a simple
-config value per chat, not a full user system." That's `household.json`.
+Telegram user_id -> owner-name mapping is a simple per-chat config value
+(`household.json`), not a full user system — deliberately, for a
+single-household MVP.
 """
 
 from __future__ import annotations
@@ -40,14 +41,13 @@ class Settings:
     metrics_hour: int
     metrics_minute: int
     metrics_weekday: int  # python-telegram-bot JobQueue convention: 0=Sunday..6=Saturday
-    # Model provider (design spec §8 / hackathon Phase B). "anthropic" (default)
-    # is the original Week-1 direct-API path; "bedrock" routes through Amazon
-    # Bedrock instead. anthropic_api_key is only required for "anthropic".
+    # Model provider — see README "Model provider". "anthropic" is the
+    # direct-API path; "bedrock" routes through Amazon Bedrock instead.
+    # anthropic_api_key is only required for "anthropic".
     model_provider: str = "anthropic"
     anthropic_api_key: str | None = None
-    # Hackathon/AgentCore target (design spec §8).
-    # persistence_backend: "sqlite" (default, Week-1) or "dynamodb" (AWS-backed,
-    # covered by moto tests, now runnable for real once aws_region is set).
+    # persistence_backend: "sqlite" (default, local dev) or "dynamodb"
+    # (AWS-backed, covered by moto tests, used by the deployed path).
     persistence_backend: str = "sqlite"
     dynamodb_table_name: str = "cos_tasks"
     # AWS region, shared by both the Bedrock model calls and the DynamoDB
@@ -58,8 +58,8 @@ class Settings:
     # default credential chain — handy for local dev with `aws configure
     # --profile <name>`. Leave unset in production (e.g. AgentCore's IAM role).
     aws_profile: str | None = None
-    # Gateway/brain split (design spec §8, hackathon Phase C). "local"
-    # (default) runs the Strands Agent in-process, same as before the split.
+    # Gateway/brain split — see README "Architecture" / "Gateway/brain mode".
+    # "local" (default) runs the Strands Agent in-process.
     # "agentcore" instead fires each instruction at a deployed Bedrock
     # AgentCore Runtime endpoint (agentcore_runtime_arn, required in that
     # mode) via invoke_agent_runtime — the deployed container sends the

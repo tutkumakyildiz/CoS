@@ -1,7 +1,7 @@
-"""Persistence contract for the `task_store` tools — see design spec §8.
+"""Persistence contract for the `task_store` tools.
 
-Two implementations: `SqliteTaskStoreBackend` (today's default) and
-`DynamoDBTaskStoreBackend` (the hackathon/AgentCore target, since AgentCore's
+Two implementations: `SqliteTaskStoreBackend` (local dev) and
+`DynamoDBTaskStoreBackend` (the deployed path, since AgentCore Runtime
 containers are ephemeral and can't read/write a local SQLite file). Both
 return plain dicts/lists shaped exactly like a `tasks` row: same keys, same
 types — so `tools/task_store.py`'s `@tool` functions never need to know

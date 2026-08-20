@@ -1,7 +1,7 @@
-"""System prompt — spec §5, verbatim, plus a small household context block.
+"""System prompt, plus a small household context block appended at build time.
 
-Tone is left untouched from the spec's draft ("tune once you see real usage" —
-spec §5 preamble, and Week 3 in the build order is explicitly for this).
+Tone has been tuned against real usage in the live household group, not
+just written once and left alone.
 """
 
 from __future__ import annotations

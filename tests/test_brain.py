@@ -1,7 +1,7 @@
 """Tests for cos.brain — the agent-invocation logic extracted from bot.py
-(design spec §8's "brain"/gateway split). No real Telegram/Anthropic/AWS
-calls; the Strands Agent is faked so these exercise only the retry-on-
-silent-drop logic and the AgentCore-shaped payload dispatch.
+(the "brain"/gateway split — see README "Architecture"). No real
+Telegram/Anthropic/AWS calls; the Strands Agent is faked so these exercise
+only the retry-on-silent-drop logic and the AgentCore-shaped payload dispatch.
 
 These are the same cases that used to live in test_bot.py against
 bot_module._invoke_agent, moved here along with the code.

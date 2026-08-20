@@ -1,17 +1,18 @@
 """The agent-invocation "brain" — split out from the Telegram gateway
-(telegram_bot/bot.py) per the hackathon target architecture (design spec
-§8). The gateway stays a normal long-running process (Telegram polling +
-scheduling); everything here is what eventually runs inside Amazon Bedrock
-AgentCore Runtime instead, invoked per-message via boto3's
-invoke_agent_runtime rather than as a local function call.
+(telegram_bot/bot.py) so it can run either in-process or as a deployed
+Amazon Bedrock AgentCore Runtime container (see README "Architecture"). The
+gateway stays a normal long-running process (Telegram polling + scheduling);
+everything here is what runs inside AgentCore Runtime instead when deployed,
+invoked per-message via boto3's invoke_agent_runtime rather than as a local
+function call.
 
-Today (no AgentCore deployment yet — see README "Design deviations"),
-`run_instruction` is still called in-process by bot.py, so nothing about the
-gateway's actual behavior has changed; this file is the extraction, not the
-deployment. `handle_payload` is the JSON-in/JSON-out shape an AgentCore
-`@app.entrypoint` needs — see runtime_entrypoint.py, the separate adapter
-that wraps this for real deployment (kept separate so the AgentCore SDK
-dependency never has to be installed for local dev or the test suite).
+`run_instruction` is called in-process by bot.py when COS_AGENT_MODE=local,
+or inside the deployed container when COS_AGENT_MODE=agentcore (see
+`invoke_brain` below for the dispatch). `handle_payload` is the JSON-in/
+JSON-out shape an AgentCore `@app.entrypoint` needs — see
+runtime_entrypoint.py, the separate adapter that wraps this for real
+deployment (kept separate so the AgentCore SDK dependency never has to be
+installed for local dev or the test suite).
 """
 
 from __future__ import annotations
@@ -79,9 +80,9 @@ async def run_instruction(settings: Settings, bot: Bot, instruction: str, *, log
 
 
 async def invoke_remote(settings: Settings, instruction: str, *, log_context: str) -> None:
-    """Gateway-side call to a deployed Bedrock AgentCore Runtime endpoint
-    (design spec §8, hackathon Phase C), used instead of `run_instruction`
-    when `settings.agent_mode == "agentcore"`. Fires the same instruction at
+    """Gateway-side call to a deployed Bedrock AgentCore Runtime endpoint,
+    used instead of `run_instruction` when `settings.agent_mode ==
+    "agentcore"`. Fires the same instruction at
     the deployed container via `invoke_agent_runtime`; the container runs
     this exact module's `run_instruction` internally (via runtime_entrypoint.py
     -> handle_payload) and sends the Telegram reply itself as a side effect —
