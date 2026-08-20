@@ -16,10 +16,13 @@ dependency never has to be installed for local dev or the test suite).
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 from datetime import date
 from typing import Any
 
+import boto3
 from telegram import Bot
 
 from cos.agent import get_agent, get_response_tracker
@@ -73,6 +76,52 @@ async def run_instruction(settings: Settings, bot: Bot, instruction: str, *, log
             await agent.invoke_async(RETRY_NUDGE)
         except Exception:
             logger.exception("Agent failed on retry after %s", log_context)
+
+
+async def invoke_remote(settings: Settings, instruction: str, *, log_context: str) -> None:
+    """Gateway-side call to a deployed Bedrock AgentCore Runtime endpoint
+    (design spec §8, hackathon Phase C), used instead of `run_instruction`
+    when `settings.agent_mode == "agentcore"`. Fires the same instruction at
+    the deployed container via `invoke_agent_runtime`; the container runs
+    this exact module's `run_instruction` internally (via runtime_entrypoint.py
+    -> handle_payload) and sends the Telegram reply itself as a side effect —
+    this function doesn't touch `bot` at all, deliberately, and just waits for
+    the call to complete.
+
+    `runtimeSessionId` is pinned per chat_id so repeat invocations route back
+    to the same warm container/session where possible, the closest AgentCore
+    equivalent to `agent.py`'s in-process per-chat_id Agent cache.
+    """
+    client = boto3.Session(profile_name=settings.aws_profile, region_name=settings.aws_region).client(
+        "bedrock-agentcore"
+    )
+    session_id = f"cos-chat-{settings.household.chat_id}".ljust(33, "0")
+    body = json.dumps({"instruction": instruction, "log_context": log_context}).encode("utf-8")
+
+    def _invoke() -> None:
+        resp = client.invoke_agent_runtime(
+            agentRuntimeArn=settings.agentcore_runtime_arn,
+            runtimeSessionId=session_id,
+            payload=body,
+        )
+        resp["response"].read()  # drain the stream; body is just {"status": "ok"}
+
+    try:
+        await asyncio.to_thread(_invoke)
+    except Exception:
+        logger.exception("AgentCore Runtime invocation failed %s", log_context)
+
+
+async def invoke_brain(settings: Settings, bot: Bot, instruction: str, *, log_context: str) -> None:
+    """Gateway's single dispatch point: local in-process agent, or the
+    deployed AgentCore Runtime, chosen by `settings.agent_mode`. All four
+    of bot.py's handlers (message, callback, daily nudge, weekly metrics)
+    call this instead of `run_instruction` directly.
+    """
+    if settings.agent_mode == "agentcore":
+        await invoke_remote(settings, instruction, log_context=log_context)
+    else:
+        await run_instruction(settings, bot, instruction, log_context=log_context)
 
 
 async def handle_payload(payload: dict[str, Any], settings: Settings, bot: Bot) -> dict[str, Any]:

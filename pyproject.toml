@@ -15,9 +15,8 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8.0.0", "moto[dynamodb]>=5.0.0"]
 # Only needed to deploy runtime_entrypoint.py to Bedrock AgentCore Runtime —
-# not installed by default. Exact package name/version unverified against a
-# real deploy yet; confirm against AWS's current docs first (design spec §8).
-agentcore = ["bedrock-agentcore"]
+# not installed by default. Verified against a real deploy (see Dockerfile).
+agentcore = ["bedrock-agentcore>=1.22.0"]
 
 [build-system]
 requires = ["setuptools>=68"]
