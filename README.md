@@ -4,7 +4,7 @@ Household chief-of-staff Telegram bot, built on the [Strands Agents SDK](https:/
 
 ## Architecture
 
-![CoS agent-invocation path: default vs. fallback](docs/architecture.svg)
+![CoS architecture](docs/architecture.svg)
 
 CoS splits into a **gateway** and a **brain**, because Amazon Bedrock AgentCore Runtime is a synchronous request/response HTTP service with no native support for a long-polling Telegram listener or scheduled background jobs:
 
