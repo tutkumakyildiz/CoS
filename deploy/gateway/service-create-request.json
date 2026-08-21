@@ -1,0 +1,18 @@
+{
+  "cluster": "cos-cluster",
+  "serviceName": "cos-gateway",
+  "taskDefinition": "cos-gateway",
+  "desiredCount": 0,
+  "launchType": "FARGATE",
+  "deploymentConfiguration": {
+    "minimumHealthyPercent": 0,
+    "maximumPercent": 100
+  },
+  "networkConfiguration": {
+    "awsvpcConfiguration": {
+      "subnets": ["REPLACE_WITH_DEFAULT_VPC_PUBLIC_SUBNET_IDS"],
+      "securityGroups": ["REPLACE_WITH_EGRESS_ONLY_SECURITY_GROUP_ID"],
+      "assignPublicIp": "ENABLED"
+    }
+  }
+}

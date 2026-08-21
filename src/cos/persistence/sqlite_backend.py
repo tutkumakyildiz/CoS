@@ -123,6 +123,15 @@ class SqliteTaskStoreBackend(TaskStoreBackend):
             rows = cur.fetchall()
         return [_row_to_dict(r) for r in rows]
 
+    def get_all_tasks(self, *, chat_id: str) -> list[dict[str, Any]]:
+        with cursor() as cur:
+            cur.execute(
+                "SELECT * FROM tasks WHERE chat_id = ? ORDER BY created_at DESC",
+                (chat_id,),
+            )
+            rows = cur.fetchall()
+        return [_row_to_dict(r) for r in rows]
+
     def get_weekly_metrics(self, *, chat_id: str, days: int = 7) -> dict[str, Any]:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         since = (date.today() - timedelta(days=days)).isoformat()

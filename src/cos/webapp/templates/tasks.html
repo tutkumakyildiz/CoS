@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Tasks — CoS Dashboard{% endblock %}
+{% block content %}
+  <form method="get" action="/tasks" class="filters">
+    <label>Status
+      <select name="status" onchange="this.form.submit()">
+        <option value="" {% if not selected_status %}selected{% endif %}>All</option>
+        {% for s in ["open", "in_progress", "done", "snoozed"] %}
+          <option value="{{ s }}" {% if selected_status == s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Owner
+      <select name="owner" onchange="this.form.submit()">
+        <option value="" {% if not selected_owner %}selected{% endif %}>All</option>
+        {% for owner_id, owner_name in owners %}
+          <option value="{{ owner_id }}" {% if selected_owner == owner_id %}selected{% endif %}>{{ owner_name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+  </form>
+
+  {% if rows %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Title</th>
+          <th>Category</th>
+          <th>Status</th>
+          <th>Owner</th>
+          <th>Due</th>
+          <th>Created by</th>
+          <th>Created</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in rows %}
+        <tr class="status-{{ t.status }}">
+          <td>{{ t.title }}</td>
+          <td>{{ t.category }}</td>
+          <td><span class="badge badge-{{ t.status }}">{{ t.status }}</span></td>
+          <td>{{ t.owner_name }}</td>
+          <td>{{ t.due_date or "—" }}</td>
+          <td>{{ t.created_by_name }}</td>
+          <td>{{ t.created_at[:10] if t.created_at else "—" }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+    <p class="empty">No tasks match this filter.</p>
+  {% endif %}
+{% endblock %}

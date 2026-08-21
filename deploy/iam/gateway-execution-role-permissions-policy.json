@@ -1,0 +1,12 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {"Effect":"Allow","Action":["ecr:GetAuthorizationToken"],"Resource":"*"},
+    {"Effect":"Allow","Action":["ecr:BatchCheckLayerAvailability","ecr:GetDownloadUrlForLayer","ecr:BatchGetImage"],
+     "Resource":["arn:aws:ecr:eu-central-1:123456789012:repository/cos-gateway"]},
+    {"Effect":"Allow","Action":["logs:CreateLogStream","logs:PutLogEvents"],
+     "Resource":["arn:aws:logs:eu-central-1:123456789012:log-group:/ecs/cos-gateway:*"]},
+    {"Effect":"Allow","Action":["secretsmanager:GetSecretValue"],
+     "Resource":["arn:aws:secretsmanager:eu-central-1:123456789012:secret:cos/gateway/telegram-bot-token-*"]}
+  ]
+}

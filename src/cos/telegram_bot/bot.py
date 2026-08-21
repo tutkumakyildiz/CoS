@@ -129,7 +129,8 @@ def run() -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
     settings = load_settings()
-    init_db(settings.db_path)
+    if settings.persistence_backend == "sqlite":
+        init_db(settings.db_path)
 
     app = build_application(settings)
     logger.info("CoS listening on chat_id=%s", settings.household.chat_id)

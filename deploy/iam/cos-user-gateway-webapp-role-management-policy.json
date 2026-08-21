@@ -1,0 +1,25 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ManageGatewayAndWebappRoles",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:DeleteRole",
+        "iam:GetRole",
+        "iam:PutRolePolicy",
+        "iam:DeleteRolePolicy",
+        "iam:GetRolePolicy",
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy",
+        "iam:TagRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::123456789012:role/cos-gateway-execution-role",
+        "arn:aws:iam::123456789012:role/cos-gateway-task-role",
+        "arn:aws:iam::123456789012:role/cos-webapp-instance-role"
+      ]
+    }
+  ]
+}

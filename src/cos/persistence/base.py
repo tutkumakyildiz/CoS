@@ -47,6 +47,14 @@ class TaskStoreBackend(ABC):
     @abstractmethod
     def get_weekly_metrics(self, *, chat_id: str, days: int = 7) -> dict[str, Any]: ...
 
+    @abstractmethod
+    def get_all_tasks(self, *, chat_id: str) -> list[dict[str, Any]]:
+        """Every task for this chat regardless of status — open, in_progress,
+        done, snoozed. Not exposed as an agent `@tool` (the agent only ever
+        needs the status-scoped reads above); this exists for the web
+        dashboard's task list, which needs to show done tasks too."""
+        ...
+
 
 def grouped_pct(counts: dict[str, int], total: int) -> dict[str, float]:
     """Shared by both backends so percentage math isn't duplicated (and can't

@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Bot status — CoS Dashboard{% endblock %}
+{% block content %}
+  {% if restarted %}<p class="notice">Restart triggered — the gateway will redeploy shortly.</p>{% endif %}
+  {% if error %}<p class="error">{{ error }}</p>{% endif %}
+
+  {% if service %}
+    <dl class="status-grid">
+      <dt>Cluster</dt><dd>{{ cluster }}</dd>
+      <dt>Service</dt><dd>{{ ecs_service_name }}</dd>
+      <dt>Status</dt><dd>{{ service.status }}</dd>
+      <dt>Running</dt><dd>{{ service.runningCount }} / desired {{ service.desiredCount }}</dd>
+      <dt>Pending</dt><dd>{{ service.pendingCount }}</dd>
+    </dl>
+
+    <form method="post" action="/status/restart" onsubmit="return confirm('Restart the gateway now? It will briefly stop responding while it redeploys.');">
+      <button type="submit">Restart gateway</button>
+    </form>
+  {% endif %}
+{% endblock %}
