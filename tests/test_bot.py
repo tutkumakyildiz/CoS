@@ -8,14 +8,16 @@ was split out of bot.py into brain.py.
 
 from __future__ import annotations
 
+import asyncio
 import tempfile
 from pathlib import Path
+from unittest.mock import AsyncMock, MagicMock
 from zoneinfo import ZoneInfo
 
 import pytest
 
 from cos.config import HouseholdConfig, Settings
-from cos.telegram_bot.bot import build_application
+from cos.telegram_bot.bot import _handle_callback, build_application
 
 
 @pytest.fixture()
@@ -64,3 +66,50 @@ def test_build_application_raises_without_job_queue_extra(settings, monkeypatch)
 
     with pytest.raises(RuntimeError, match="JobQueue not available"):
         build_application(settings)
+
+
+def test_handle_callback_edits_message_to_show_tap_registered(settings, monkeypatch):
+    # A tapped button should get instant visual feedback — the original
+    # message rewritten with the choice made and its keyboard removed —
+    # rather than sitting unchanged until the agent's own confirmation
+    # (which can take a few seconds) arrives as a separate message.
+    monkeypatch.setattr("cos.telegram_bot.bot.invoke_brain", AsyncMock())
+
+    query = MagicMock()
+    query.data = "task-1::Assign to Alex"
+    query.from_user = MagicMock(id=111)
+    query.answer = AsyncMock()
+    query.edit_message_text = AsyncMock()
+    query.message = MagicMock(text="Who's taking out the trash?")
+
+    update = MagicMock(callback_query=query)
+    context = MagicMock()
+
+    asyncio.run(_handle_callback(update, context, settings))
+
+    query.answer.assert_awaited_once()
+    query.edit_message_text.assert_awaited_once_with(
+        text="Who's taking out the trash?\n\n☑️ Alex: Assign to Alex",
+        reply_markup=None,
+    )
+
+
+def test_handle_callback_still_invokes_brain_if_edit_fails(settings, monkeypatch):
+    # The edit is best-effort UI polish — a failure there (e.g. a stale
+    # message) must not stop the actual assignment logic from running.
+    brain_mock = AsyncMock()
+    monkeypatch.setattr("cos.telegram_bot.bot.invoke_brain", brain_mock)
+
+    query = MagicMock()
+    query.data = "task-1::Assign to Alex"
+    query.from_user = MagicMock(id=111)
+    query.answer = AsyncMock()
+    query.edit_message_text = AsyncMock(side_effect=RuntimeError("message too old"))
+    query.message = MagicMock(text="Who's taking out the trash?")
+
+    update = MagicMock(callback_query=query)
+    context = MagicMock()
+
+    asyncio.run(_handle_callback(update, context, settings))
+
+    brain_mock.assert_awaited_once()

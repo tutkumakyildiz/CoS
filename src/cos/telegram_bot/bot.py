@@ -51,6 +51,21 @@ async def _handle_callback(update: Update, context: ContextTypes.DEFAULT_TYPE, s
     task_id, _, option = query.data.partition("::")
     user = query.from_user
     sender_name = settings.household.name_for(user.id) if user else "someone"
+
+    # Give instant visual feedback: swap the tapped keyboard out for a
+    # confirmation line so the tap is visibly registered right away, rather
+    # than leaving the buttons sitting there unchanged while the agent (which
+    # can take a few seconds) works in the background before it can send its
+    # own confirmation as a new message.
+    if query.message is not None and query.message.text is not None:
+        try:
+            await query.edit_message_text(
+                text=f"{query.message.text}\n\n☑️ {sender_name}: {option}",
+                reply_markup=None,
+            )
+        except Exception:
+            logger.exception("Failed to edit message after callback tap on task %s", task_id)
+
     instruction = (
         f"{today_prefix()} Button tap from {sender_name} (user id {user.id if user else 'unknown'}) "
         f'on task {task_id}: chose "{option}". Handle it (e.g. update ownership via '
