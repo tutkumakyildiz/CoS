@@ -2,9 +2,8 @@ name: CI
 
 # Runs the test suite on every PR (including from forks — this job never
 # touches secrets or AWS, so it's safe to run on untrusted code) and on
-# every push to main. Its "test" job is the required status check that
-# gates deploy-gateway.yml's push-to-main trigger — see branch protection
-# on main and deploy-gateway.yml's own comment.
+# every push to main. Its "test" job is the required status check enforced
+# by branch protection on main.
 
 on:
   pull_request:
