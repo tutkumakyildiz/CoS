@@ -66,6 +66,10 @@ Two long-pollers sharing one bot token causes Telegram's `getUpdates` to return 
 
 ## Redeploying after a code change
 
+Automated: `.github/workflows/deploy-gateway.yml` runs these same steps on every push to `main` that touches gateway-relevant paths, authenticating to AWS via OIDC (no stored credentials) — see `deploy/iam/README.md`'s "GitHub Actions (OIDC)" section for the one-time setup. Once that's done, redeploying is just: merge to `main`.
+
+Manual (for the initial setup above, or if the workflow isn't configured yet):
+
 ```bash
 docker buildx build --platform linux/arm64 -f deploy/gateway/Dockerfile \
   -t 123456789012.dkr.ecr.eu-central-1.amazonaws.com/cos-gateway:latest . --push

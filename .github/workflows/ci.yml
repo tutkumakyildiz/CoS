@@ -1,0 +1,26 @@
+name: CI
+
+# Runs the test suite on every PR (including from forks — this job never
+# touches secrets or AWS, so it's safe to run on untrusted code) and on
+# every push to main. Its "test" job is the required status check that
+# gates deploy-gateway.yml's push-to-main trigger — see branch protection
+# on main and deploy-gateway.yml's own comment.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.13"
+      - run: pip install -e ".[dev,webapp,agentcore]"
+      - run: python -m pytest -q
