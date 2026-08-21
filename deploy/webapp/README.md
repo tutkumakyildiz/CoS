@@ -2,7 +2,7 @@
 
 Reference commands for hosting the read-only task list + bot status/restart panel on AWS App Runner. Applied by hand — same convention as `deploy/gateway/` and `deploy/iam/`.
 
-**Before using:** replace `123456789012` with your own AWS account id, and adjust region/resource names if yours differ from `eu-central-1` / `cos-webapp`.
+**Before using:** replace `123456789012` with your own AWS account id, and adjust region/resource names if yours differ from `eu-central-1` / `cos-webapp`. Every `aws` command below also needs `--profile cos-hackathon` (or `export AWS_PROFILE=cos-hackathon` once per shell session) — the deploying IAM user's credentials live under that named profile, not `default` — see `deploy/gateway/README.md`'s note on this for why.
 
 ## Status (2026-08-21): not yet deployed — paused, decision pending
 
