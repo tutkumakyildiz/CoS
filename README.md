@@ -78,7 +78,7 @@ See `.env.example` for the full set of variables.
 
 The gateway is a blocking Telegram long-poll process with two `JobQueue` scheduled jobs — it needs to stay running 24/7, but (unlike the brain) is not a request/response HTTP service, so it doesn't fit AgentCore Runtime. It runs instead as an always-on **ECS Fargate** task: no load balancer (it takes no inbound traffic at all — pure outbound long-poll + outbound `invoke_agent_runtime` calls), `TELEGRAM_BOT_TOKEN` resolved from **AWS Secrets Manager**, and a deployment config (`minimumHealthyPercent: 0, maximumPercent: 100`) that guarantees the old task fully stops before a new one starts — this matters because two long-pollers sharing one bot token causes Telegram's `getUpdates` to 409 (`Conflict: terminated by other getUpdates request`).
 
-Full setup, cutover sequence (how to move from a local `python -m cos.main` process to the ECS-hosted one without hitting that conflict), and redeploy commands: see [`deploy/gateway/README.md`](deploy/gateway/README.md). Once that's set up, redeploys happen automatically on push to `main` via [`.github/workflows/deploy-gateway.yml`](.github/workflows/deploy-gateway.yml), authenticating to AWS via OIDC rather than stored credentials — see [`deploy/iam/README.md`](deploy/iam/README.md)'s "GitHub Actions (OIDC)" section.
+Full setup, cutover sequence (how to move from a local `python -m cos.main` process to the ECS-hosted one without hitting that conflict), and redeploy commands: see [`deploy/gateway/README.md`](deploy/gateway/README.md).
 
 ## Web dashboard
 
