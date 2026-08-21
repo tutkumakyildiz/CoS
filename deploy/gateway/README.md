@@ -4,6 +4,8 @@ Reference templates/commands for running the Telegram gateway (`cos.main`) as an
 
 **Before using:** replace every `123456789012` placeholder with your own AWS account id, and adjust region/resource names if yours differ from `eu-central-1` / `cos-gateway` / `cos-cluster` / `cos_brain-*` / `cos_tasks`.
 
+**Every `aws` command below needs `--profile cos-hackathon`** (or `export AWS_PROFILE=cos-hackathon` once per shell session) — the deploying IAM user's credentials live under that named profile in `~/.aws/credentials`, not `default`. Without it you'll get `Unable to locate credentials` even though the credentials are right there on disk. (`docker buildx build --push` doesn't need this — it reuses a cached ECR auth token from the last time `aws ecr get-login-password --profile cos-hackathon | docker login ...` ran, which stays valid for ~12h.)
+
 ## Why ECS Fargate, not AgentCore Runtime
 
 The gateway is a blocking `python-telegram-bot` long-poll process (`app.run_polling()`) plus two `JobQueue.run_daily` scheduled jobs — it needs to stay running 24/7 and holds no inbound HTTP endpoint at all. AgentCore Runtime is a synchronous request/response HTTP service with no support for either of those, which is exactly why this project already splits into a gateway/brain architecture (see the root README's "Architecture" section). The brain deploys to AgentCore; the gateway needs a plain always-on container instead — ECS Fargate, no load balancer (no inbound traffic to receive).
