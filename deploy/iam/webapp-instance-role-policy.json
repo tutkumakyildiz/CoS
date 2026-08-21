@@ -1,0 +1,44 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadTasksTable",
+      "Effect": "Allow",
+      "Action": ["dynamodb:GetItem", "dynamodb:Query"],
+      "Resource": ["arn:aws:dynamodb:eu-central-1:123456789012:table/cos_tasks"]
+    },
+    {
+      "Sid": "ReadWebappSecrets",
+      "Effect": "Allow",
+      "Action": ["secretsmanager:GetSecretValue"],
+      "Resource": [
+        "arn:aws:secretsmanager:eu-central-1:123456789012:secret:cos/webapp/password-*",
+        "arn:aws:secretsmanager:eu-central-1:123456789012:secret:cos/webapp/session-secret-*"
+      ]
+    },
+    {
+      "Sid": "GatewayStatusAndRestart",
+      "Effect": "Allow",
+      "Action": ["ecs:DescribeServices", "ecs:UpdateService"],
+      "Resource": ["arn:aws:ecs:eu-central-1:123456789012:service/cos-cluster/cos-gateway"]
+    },
+    {
+      "Sid": "ECRPullWebappImage",
+      "Effect": "Allow",
+      "Action": ["ecr:GetAuthorizationToken"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ECRPullWebappImageLayers",
+      "Effect": "Allow",
+      "Action": ["ecr:BatchCheckLayerAvailability", "ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage"],
+      "Resource": ["arn:aws:ecr:eu-central-1:123456789012:repository/cos-webapp"]
+    },
+    {
+      "Sid": "WebappLogs",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": ["arn:aws:logs:eu-central-1:123456789012:log-group:/ecs/cos-webapp:*"]
+    }
+  ]
+}

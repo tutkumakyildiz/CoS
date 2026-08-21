@@ -60,6 +60,24 @@ def test_mark_done_missing_raises(backend):
         backend.mark_done(chat_id="chat-1", task_id="does-not-exist")
 
 
+def test_get_all_tasks_includes_done(backend):
+    open_task = backend.create_task(chat_id="chat-1", title="Buy milk", category="errand", created_by="111")
+    done_task = backend.create_task(chat_id="chat-1", title="Book dentist", category="appointment", created_by="111")
+    backend.mark_done(chat_id="chat-1", task_id=done_task["task_id"])
+
+    all_tasks = backend.get_all_tasks(chat_id="chat-1")
+    assert {t["task_id"] for t in all_tasks} == {open_task["task_id"], done_task["task_id"]}
+    assert {t["status"] for t in all_tasks} == {"open", "done"}
+
+
+def test_get_all_tasks_scoped_to_chat(backend):
+    backend.create_task(chat_id="chat-1", title="Chat 1 task", category="errand", created_by="111")
+    backend.create_task(chat_id="chat-2", title="Chat 2 task", category="errand", created_by="222")
+
+    assert [t["title"] for t in backend.get_all_tasks(chat_id="chat-1")] == ["Chat 1 task"]
+    assert [t["title"] for t in backend.get_all_tasks(chat_id="chat-2")] == ["Chat 2 task"]
+
+
 def test_overdue_tasks(backend):
     backend.create_task(
         chat_id="chat-1", title="Pay HOA fee", category="admin", created_by="111", due_date="2000-01-01"

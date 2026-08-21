@@ -1,0 +1,11 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InvokeBrainRuntime",
+      "Effect": "Allow",
+      "Action": ["bedrock-agentcore:InvokeAgentRuntime"],
+      "Resource": ["arn:aws:bedrock-agentcore:eu-central-1:123456789012:runtime/cos_brain-*"]
+    }
+  ]
+}

@@ -68,7 +68,10 @@ class Settings:
     agentcore_runtime_arn: str | None = None
 
 
-def _load_household(path: Path) -> HouseholdConfig:
+def load_household(path: Path) -> HouseholdConfig:
+    """Public so other entrypoints (e.g. src/cos/webapp) that need the
+    partners mapping/chat_id but not the rest of Settings can reuse this
+    instead of duplicating household.json parsing."""
     if not path.exists():
         raise FileNotFoundError(
             f"Household config not found at {path}. Copy household.example.json "
@@ -129,7 +132,7 @@ def load_settings() -> Settings:
         telegram_bot_token=require("TELEGRAM_BOT_TOKEN"),
         model_id=os.environ.get("COS_MODEL_ID", "claude-haiku-4-5"),
         db_path=db_path,
-        household=_load_household(household_path),
+        household=load_household(household_path),
         nudge_hour=int(os.environ.get("COS_NUDGE_HOUR", "9")),
         nudge_timezone=_resolve_timezone(os.environ.get("COS_TIMEZONE")),
         metrics_hour=int(os.environ.get("COS_METRICS_HOUR", "10")),

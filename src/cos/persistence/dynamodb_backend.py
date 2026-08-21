@@ -179,6 +179,11 @@ class DynamoDBTaskStoreBackend(TaskStoreBackend):
         items.sort(key=lambda i: i["due_date"])
         return items
 
+    def get_all_tasks(self, *, chat_id: str) -> list[dict[str, Any]]:
+        items = self._query_chat(chat_id)
+        items.sort(key=lambda i: i.get("created_at") or "", reverse=True)
+        return items
+
     def get_weekly_metrics(self, *, chat_id: str, days: int = 7) -> dict[str, Any]:
         cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
         since = (date.today() - timedelta(days=days)).isoformat()

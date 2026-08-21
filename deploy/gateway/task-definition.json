@@ -1,0 +1,45 @@
+{
+  "family": "cos-gateway",
+  "requiresCompatibilities": ["FARGATE"],
+  "networkMode": "awsvpc",
+  "runtimePlatform": { "cpuArchitecture": "ARM64", "operatingSystemFamily": "LINUX" },
+  "cpu": "256",
+  "memory": "512",
+  "executionRoleArn": "arn:aws:iam::123456789012:role/cos-gateway-execution-role",
+  "taskRoleArn": "arn:aws:iam::123456789012:role/cos-gateway-task-role",
+  "containerDefinitions": [
+    {
+      "name": "cos-gateway",
+      "image": "123456789012.dkr.ecr.eu-central-1.amazonaws.com/cos-gateway:latest",
+      "essential": true,
+      "environment": [
+        { "name": "COS_MODEL_PROVIDER", "value": "bedrock" },
+        { "name": "COS_AGENT_MODE", "value": "agentcore" },
+        { "name": "COS_AGENTCORE_RUNTIME_ARN", "value": "arn:aws:bedrock-agentcore:eu-central-1:123456789012:runtime/cos_brain-REPLACE_ME" },
+        { "name": "COS_AWS_REGION", "value": "eu-central-1" },
+        { "name": "COS_PERSISTENCE_BACKEND", "value": "dynamodb" },
+        { "name": "COS_DYNAMODB_TABLE", "value": "cos_tasks" },
+        { "name": "COS_HOUSEHOLD_CONFIG", "value": "/app/household.json" },
+        { "name": "COS_NUDGE_HOUR", "value": "9" },
+        { "name": "COS_TIMEZONE", "value": "Europe/Berlin" },
+        { "name": "COS_METRICS_HOUR", "value": "10" },
+        { "name": "COS_METRICS_MINUTE", "value": "0" },
+        { "name": "COS_METRICS_WEEKDAY", "value": "0" }
+      ],
+      "secrets": [
+        {
+          "name": "TELEGRAM_BOT_TOKEN",
+          "valueFrom": "arn:aws:secretsmanager:eu-central-1:123456789012:secret:cos/gateway/telegram-bot-token"
+        }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/cos-gateway",
+          "awslogs-region": "eu-central-1",
+          "awslogs-stream-prefix": "gateway"
+        }
+      }
+    }
+  ]
+}

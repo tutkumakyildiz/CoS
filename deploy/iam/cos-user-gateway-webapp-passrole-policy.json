@@ -1,0 +1,26 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "PassGatewayRolesToECS",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": [
+        "arn:aws:iam::123456789012:role/cos-gateway-execution-role",
+        "arn:aws:iam::123456789012:role/cos-gateway-task-role"
+      ],
+      "Condition": {
+        "StringEquals": { "iam:PassedToService": "ecs-tasks.amazonaws.com" }
+      }
+    },
+    {
+      "Sid": "PassWebappRoleToAppRunner",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::123456789012:role/cos-webapp-instance-role",
+      "Condition": {
+        "StringEquals": { "iam:PassedToService": "tasks.apprunner.amazonaws.com" }
+      }
+    }
+  ]
+}
