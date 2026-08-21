@@ -29,6 +29,7 @@ on:
       - "household.json"
       - "deploy/gateway/Dockerfile"
       - ".github/workflows/deploy-gateway.yml"
+  workflow_dispatch: # manual re-run from the Actions tab, e.g. while debugging
 
 permissions:
   id-token: write # required to request the OIDC token
@@ -44,7 +45,13 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
+    # Deliberately no `environment:` here — setting one changes the OIDC
+    # token's `sub` claim from `repo:OWNER/REPO:ref:refs/heads/BRANCH` to
+    # `repo:OWNER/REPO:environment:NAME`, which the trust policy below
+    # doesn't match (and we don't have any environment protection rules
+    # configured to make the tradeoff worth it). If that changes, update
+    # both this and deploy/iam/github-actions-oidc-trust-policy.json's `sub`
+    # condition together.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
