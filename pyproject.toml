@@ -10,6 +10,10 @@ dependencies = [
     "python-telegram-bot[job-queue]>=22.8",
     "python-dotenv>=1.0.1",
     "boto3>=1.34.0",
+    # Direct SerpApi calls in cos/tools/amazon_tool.py — already a transitive
+    # dependency of strands-agents-tools, listed explicitly since this repo
+    # calls it directly rather than through a strands_tools wrapper.
+    "aiohttp>=3.9.0",
 ]
 
 [project.optional-dependencies]

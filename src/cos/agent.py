@@ -26,6 +26,7 @@ from cos.config import Settings
 from cos.persistence import get_backend
 from cos.prompts import build_system_prompt
 from cos.response_tracker import ResponseTracker
+from cos.tools.amazon_tool import build_amazon_tools
 from cos.tools.calendar_tool import build_calendar_tools
 from cos.tools.search_tool import build_search_tools
 from cos.tools.task_store import build_task_store_tools
@@ -72,6 +73,7 @@ def get_agent(settings: Settings, bot: Bot) -> Agent:
         *build_telegram_tools(bot, chat_id),
         *build_calendar_tools(settings),
         *build_search_tools(settings),
+        *build_amazon_tools(settings),
     ]
 
     tracker = ResponseTracker()

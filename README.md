@@ -47,8 +47,10 @@ CoS splits into a **gateway** and a **brain**, because Amazon Bedrock AgentCore 
 - **On-demand queries** — ask CoS what's open any time ("what should I get from the market").
 - **Weekly stats** — a neutral summary of tasks captured/completed per partner, and how many were resolved without a reminder. No praise, no blame.
 - **Reply safety net** — the agent retries automatically if it silently forgets to send its reply.
-- **Web search** — answers things not in the task list (store hours, "find a plumber near us") via Tavily. Optional; see "Optional: web search + Google Calendar" below.
+- **Web search** — answers things not in the task list (store hours, "find a plumber near us") via Tavily. Optional; see "Optional: web search + Google Calendar + Amazon product search" below.
 - **Google Calendar** — cross-references seasonal/recurring tasks against real calendar events, and can put a task with a due date onto the calendar. Optional; same section below.
+- **Amazon product search** — finds/compares products and returns a link for requests like "find a dishwasher detergent on Amazon" (via SerpApi's Amazon Search API). Finds and links only — never purchases anything. Optional; see "Optional: web search + Google Calendar + Amazon product search" below.
+- **Direct `@mention` assignment** — explicitly @-mentioning the bot skips the ownership question and assigns straight to the sender.
 
 ## Status
 
@@ -58,7 +60,9 @@ Runs on **Amazon Bedrock** (Claude via `strands.models.bedrock.BedrockModel`, EU
 
 The **gateway** now runs live on **ECS Fargate** (`cos-cluster`/`cos-gateway`, `eu-central-1`) instead of a local process — cutover completed and live-verified: clean startup with no Telegram polling conflicts, a real inbound message and a real button-tap callback both round-tripped correctly through the deployed AgentCore brain and back to Telegram. `TELEGRAM_BOT_TOKEN` now lives in Secrets Manager rather than a plaintext deploy file.
 
-**Web search and Google Calendar are both live** (see "Features" above and "Optional: web search + Google Calendar" under Setup) — real Tavily and Google Calendar API v3 integrations, not stubs; both live-verified against the real deployed brain (a real search query answered, a real task landed on the real calendar). Credentials for both are set as `environmentVariables` on the AgentCore Runtime (`deploy/agentcore-runtime-create-request.json`, gitignored — real secrets, not Secrets Manager, same as `TELEGRAM_BOT_TOKEN` there), not on the gateway. **Direct `@mention` assignment** is also live: explicitly @-mentioning the bot (a real Telegram mention entity, detected in `telegram_bot/bot.py`) skips the ownership question and assigns straight to the sender — a passive task-shaped mention in conversation still asks as before, unchanged. All three shipped together in [PR #13](https://github.com/tutkumakyildiz/CoS/pull/13).
+**Web search and Google Calendar are both live** (see "Features" above and "Optional: web search + Google Calendar + Amazon product search" under Setup) — real Tavily and Google Calendar API v3 integrations, not stubs; both live-verified against the real deployed brain (a real search query answered, a real task landed on the real calendar). Credentials for both are set as `environmentVariables` on the AgentCore Runtime (`deploy/agentcore-runtime-create-request.json`, gitignored — real secrets, not Secrets Manager, same as `TELEGRAM_BOT_TOKEN` there), not on the gateway. **Direct `@mention` assignment** is also live: explicitly @-mentioning the bot (a real Telegram mention entity, detected in `telegram_bot/bot.py`) skips the ownership question and assigns straight to the sender — a passive task-shaped mention in conversation still asks as before, unchanged. All three shipped together in [PR #13](https://github.com/tutkumakyildiz/CoS/pull/13).
+
+**Amazon product search is also live** (`cos/tools/amazon_tool.py`, SerpApi's Amazon Search API) — `SERPAPI_API_KEY` is set in the AgentCore Runtime's `environmentVariables` alongside the Tavily/Google Calendar credentials (runtime version 5), and live-verified end-to-end: a real `@`-mention request in the household chat ("find us amazon choice dishwasher detergent") triggered a real SerpApi Amazon Search call (confirmed via SerpApi's account usage counter) and a real product link came back over Telegram.
 
 The **web dashboard** is fully built and unit-tested (`src/cos/webapp`, both Docker images pushed to ECR, the `cos-webapp-instance-role` IAM role created) and confirmed working end-to-end when run locally against the real production data (real tasks, real gateway status), but **not yet deployed anywhere reachable over the internet** — paused with the hosting approach still undecided. App Runner is blocked account-wide (`SubscriptionRequiredException`, not an IAM issue); an ECS Fargate + ALB fallback got as far as an `iam:CreateServiceLinkedRole` block on this account's first-ever ALB. See `deploy/webapp/README.md`'s "Status" section for exact state and options before resuming.
 
@@ -156,11 +160,13 @@ pytest
 
 Runs against a throwaway SQLite db — no Telegram or Anthropic credentials needed.
 
-### 7. Optional: web search + Google Calendar
+### 7. Optional: web search + Google Calendar + Amazon product search
 
-Both degrade gracefully to "not connected" if skipped — the bot works fine without either.
+All three degrade gracefully to "not connected" if skipped — the bot works fine without any of them.
 
 **Web search** (Tavily): sign up at https://app.tavily.com, copy an API key into `.env` as `TAVILY_API_KEY`. No extra install — already covered by the base `strands-agents-tools` dependency.
+
+**Amazon product search** (SerpApi): sign up at https://serpapi.com (free tier: 250 searches/month, no card required), copy an API key into `.env` as `SERPAPI_API_KEY`. No extra install — `aiohttp` is already a base dependency. Finds and compares products only; never purchases anything — see `cos/tools/amazon_tool.py`.
 
 **Google Calendar** — writes to one partner's primary calendar (OAuth-consent as that person, not a separately shared calendar):
 
@@ -197,6 +203,7 @@ src/cos/
     telegram_tools.py             # send_message, ask_choice
     calendar_tool.py              # check_upcoming_events, create_event — real Google Calendar API
     search_tool.py                # web_search — real Tavily web search
+    amazon_tool.py                # search_amazon_products — real SerpApi Amazon search (find/link only, no purchase)
   telegram_bot/
     bot.py                        # long-poll listener, callback routing, scheduled jobs, @mention detection
   webapp/                         # optional read-only dashboard (see "Web dashboard" above)
@@ -216,6 +223,7 @@ tests/
   test_response_tracker.py
   test_calendar_tool.py
   test_search_tool.py
+  test_amazon_tool.py
   test_webapp_tasks.py
   test_webapp_status.py
 deploy/
