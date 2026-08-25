@@ -62,6 +62,10 @@ class Settings:
     # Fully optional — web_search degrades to "not connected" when unset,
     # same as calendar_tool. https://app.tavily.com
     tavily_api_key: str | None = None
+    # SerpApi key for the amazon_tool (see cos/tools/amazon_tool.py). Fully
+    # optional — search_amazon_products degrades to "not connected" when
+    # unset, same as web_search. https://serpapi.com
+    serpapi_api_key: str | None = None
     # Google Calendar OAuth creds for the calendar_tool (see
     # cos/tools/calendar_tool.py and scripts/authorize_google_calendar.py).
     # All three fully optional and only meaningful together — calendar_tool
@@ -156,6 +160,7 @@ def load_settings() -> Settings:
         aws_region=aws_region,
         aws_profile=os.environ.get("COS_AWS_PROFILE") or None,
         tavily_api_key=os.environ.get("TAVILY_API_KEY") or None,
+        serpapi_api_key=os.environ.get("SERPAPI_API_KEY") or None,
         google_client_id=os.environ.get("GOOGLE_CLIENT_ID") or None,
         google_client_secret=os.environ.get("GOOGLE_CLIENT_SECRET") or None,
         google_refresh_token=os.environ.get("GOOGLE_REFRESH_TOKEN") or None,
