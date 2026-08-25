@@ -47,6 +47,8 @@ CoS splits into a **gateway** and a **brain**, because Amazon Bedrock AgentCore 
 - **On-demand queries** — ask CoS what's open any time ("what should I get from the market").
 - **Weekly stats** — a neutral summary of tasks captured/completed per partner, and how many were resolved without a reminder. No praise, no blame.
 - **Reply safety net** — the agent retries automatically if it silently forgets to send its reply.
+- **Web search** — answers things not in the task list (store hours, "find a plumber near us") via Tavily. Optional; see "Optional: web search + Google Calendar" below.
+- **Google Calendar** — cross-references seasonal/recurring tasks against real calendar events, and can put a task with a due date onto the calendar. Optional; same section below.
 
 ## Status
 
@@ -151,6 +153,26 @@ pytest
 ```
 
 Runs against a throwaway SQLite db — no Telegram or Anthropic credentials needed.
+
+### 7. Optional: web search + Google Calendar
+
+Both degrade gracefully to "not connected" if skipped — the bot works fine without either.
+
+**Web search** (Tavily): sign up at https://app.tavily.com, copy an API key into `.env` as `TAVILY_API_KEY`. No extra install — already covered by the base `strands-agents-tools` dependency.
+
+**Google Calendar** — writes to one partner's primary calendar (OAuth-consent as that person, not a separately shared calendar):
+
+1. In [Google Cloud Console](https://console.cloud.google.com/), create or select a project.
+2. **APIs & Services → OAuth consent screen**: user type **External**, publishing status **Testing** (fine for personal Gmail + 1-2 test users — avoids Google's verification review), add the chosen partner's Gmail as a test user.
+3. **APIs & Services → Library**: enable the **Google Calendar API**.
+4. **APIs & Services → Credentials → Create Credentials → OAuth client ID**, type **Desktop app**. Note the client id/secret.
+5. Install the extra and run the one-time authorization script:
+   ```bash
+   pip install -e ".[dev,calendar]"
+   GOOGLE_CLIENT_ID=... GOOGLE_CLIENT_SECRET=... python scripts/authorize_google_calendar.py
+   ```
+   This opens a browser for you to sign in as the chosen partner and grant calendar access, then prints a refresh token.
+6. Add all three (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REFRESH_TOKEN`) to `.env`.
 
 ## Project layout
 

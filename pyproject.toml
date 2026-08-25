@@ -26,6 +26,15 @@ webapp = [
     "itsdangerous>=2.2.0",
     "python-multipart>=0.0.9",
 ]
+# Only needed for real Google Calendar integration (cos/tools/calendar_tool.py
+# and scripts/authorize_google_calendar.py) — not installed by default, same
+# reasoning as the webapp extra above. calendar_tool degrades gracefully to
+# "not connected" without it as long as GOOGLE_* env vars are also unset.
+calendar = [
+    "google-auth>=2.35.0",
+    "google-auth-oauthlib>=1.2.0",
+    "google-api-python-client>=2.150.0",
+]
 
 [build-system]
 requires = ["setuptools>=68"]

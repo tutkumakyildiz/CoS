@@ -23,7 +23,7 @@ COPY pyproject.toml ./
 COPY src/ src/
 COPY household.json ./household.json
 
-RUN pip install --no-cache-dir ".[agentcore]"
+RUN pip install --no-cache-dir ".[agentcore,calendar]"
 
 # config.py resolves relative paths (COS_HOUSEHOLD_CONFIG, COS_DB_PATH) against
 # a REPO_ROOT computed from cos/config.py's own file depth — correct when
