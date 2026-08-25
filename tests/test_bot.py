@@ -17,7 +17,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from cos.config import HouseholdConfig, Settings
-from cos.telegram_bot.bot import _handle_callback, build_application
+from cos.telegram_bot.bot import _handle_callback, _handle_message, _is_direct_mention, build_application
 
 
 @pytest.fixture()
@@ -113,3 +113,59 @@ def test_handle_callback_still_invokes_brain_if_edit_fails(settings, monkeypatch
     asyncio.run(_handle_callback(update, context, settings))
 
     brain_mock.assert_awaited_once()
+
+
+def test_is_direct_mention_true_for_real_mention_entity():
+    message = MagicMock()
+    message.parse_entities.return_value = {"entity": "@cos_household_bot"}
+    assert _is_direct_mention(message, "cos_household_bot") is True
+
+
+def test_is_direct_mention_false_without_matching_entity():
+    message = MagicMock()
+    message.parse_entities.return_value = {}
+    assert _is_direct_mention(message, "cos_household_bot") is False
+
+
+def test_is_direct_mention_false_when_bot_username_unknown():
+    message = MagicMock()
+    message.parse_entities.return_value = {"entity": "@cos_household_bot"}
+    assert _is_direct_mention(message, None) is False
+
+
+def test_handle_message_flags_direct_mention_in_instruction(settings, monkeypatch):
+    brain_mock = AsyncMock()
+    monkeypatch.setattr("cos.telegram_bot.bot.invoke_brain", brain_mock)
+
+    message = MagicMock(text="@cos_household_bot book the dentist for Sep 3")
+    message.parse_entities.return_value = {"entity": "@cos_household_bot"}
+    update = MagicMock()
+    update.effective_message = message
+    update.effective_user = MagicMock(id=111)
+
+    context = MagicMock()
+    context.bot.username = "cos_household_bot"
+
+    asyncio.run(_handle_message(update, context, settings))
+
+    instruction = brain_mock.call_args.args[2]
+    assert "directly @-mentioned you" in instruction
+
+
+def test_handle_message_no_mention_note_for_passive_mention(settings, monkeypatch):
+    brain_mock = AsyncMock()
+    monkeypatch.setattr("cos.telegram_bot.bot.invoke_brain", brain_mock)
+
+    message = MagicMock(text="we need to book the dentist")
+    message.parse_entities.return_value = {}
+    update = MagicMock()
+    update.effective_message = message
+    update.effective_user = MagicMock(id=111)
+
+    context = MagicMock()
+    context.bot.username = "cos_household_bot"
+
+    asyncio.run(_handle_message(update, context, settings))
+
+    instruction = brain_mock.call_args.args[2]
+    assert "directly @-mentioned you" not in instruction

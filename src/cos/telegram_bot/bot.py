@@ -27,6 +27,18 @@ from cos.config import Settings
 logger = logging.getLogger("cos.bot")
 
 
+def _is_direct_mention(message, bot_username: str | None) -> bool:
+    """True if the message explicitly @-mentions this bot (a real Telegram
+    "mention" entity, not just a substring match) — a conscious direct
+    command, as opposed to a task-shaped mention passively noticed in
+    conversation. Detected here in code (reliable, testable) rather than
+    left for the model to spot in raw text."""
+    if not bot_username:
+        return False
+    mentions = message.parse_entities(types=["mention"]).values()
+    return any(text.lower() == f"@{bot_username}".lower() for text in mentions)
+
+
 async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, settings: Settings) -> None:
     message = update.effective_message
     user = update.effective_user
@@ -34,8 +46,13 @@ async def _handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE, se
         return
 
     sender_name = settings.household.name_for(user.id)
+    address_note = (
+        " (directly @-mentioned you — an explicit request, not a passive mention)"
+        if _is_direct_mention(message, context.bot.username)
+        else ""
+    )
     instruction = (
-        f"{today_prefix()} Telegram message from {sender_name} (user id {user.id}): "
+        f"{today_prefix()} Telegram message from {sender_name} (user id {user.id}){address_note}: "
         f'"{message.text}"'
     )
     await invoke_brain(settings, context.bot, instruction, log_context=f"handling message: {message.text!r}")

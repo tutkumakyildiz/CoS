@@ -58,6 +58,17 @@ class Settings:
     # default credential chain — handy for local dev with `aws configure
     # --profile <name>`. Leave unset in production (e.g. AgentCore's IAM role).
     aws_profile: str | None = None
+    # Tavily API key for the web_search tool (see cos/tools/search_tool.py).
+    # Fully optional — web_search degrades to "not connected" when unset,
+    # same as calendar_tool. https://app.tavily.com
+    tavily_api_key: str | None = None
+    # Google Calendar OAuth creds for the calendar_tool (see
+    # cos/tools/calendar_tool.py and scripts/authorize_google_calendar.py).
+    # All three fully optional and only meaningful together — calendar_tool
+    # degrades to "not connected" unless all three are set.
+    google_client_id: str | None = None
+    google_client_secret: str | None = None
+    google_refresh_token: str | None = None
     # Gateway/brain split — see README "Architecture" / "Gateway/brain mode".
     # "local" (default) runs the Strands Agent in-process.
     # "agentcore" instead fires each instruction at a deployed Bedrock
@@ -144,6 +155,10 @@ def load_settings() -> Settings:
         dynamodb_table_name=os.environ.get("COS_DYNAMODB_TABLE", "cos_tasks"),
         aws_region=aws_region,
         aws_profile=os.environ.get("COS_AWS_PROFILE") or None,
+        tavily_api_key=os.environ.get("TAVILY_API_KEY") or None,
+        google_client_id=os.environ.get("GOOGLE_CLIENT_ID") or None,
+        google_client_secret=os.environ.get("GOOGLE_CLIENT_SECRET") or None,
+        google_refresh_token=os.environ.get("GOOGLE_REFRESH_TOKEN") or None,
         agent_mode=agent_mode,
         agentcore_runtime_arn=agentcore_runtime_arn,
     )
