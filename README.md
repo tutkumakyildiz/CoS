@@ -58,6 +58,8 @@ Runs on **Amazon Bedrock** (Claude via `strands.models.bedrock.BedrockModel`, EU
 
 The **gateway** now runs live on **ECS Fargate** (`cos-cluster`/`cos-gateway`, `eu-central-1`) instead of a local process — cutover completed and live-verified: clean startup with no Telegram polling conflicts, a real inbound message and a real button-tap callback both round-tripped correctly through the deployed AgentCore brain and back to Telegram. `TELEGRAM_BOT_TOKEN` now lives in Secrets Manager rather than a plaintext deploy file.
 
+**Web search and Google Calendar are both live** (see "Features" above and "Optional: web search + Google Calendar" under Setup) — real Tavily and Google Calendar API v3 integrations, not stubs; both live-verified against the real deployed brain (a real search query answered, a real task landed on the real calendar). Credentials for both are set as `environmentVariables` on the AgentCore Runtime (`deploy/agentcore-runtime-create-request.json`, gitignored — real secrets, not Secrets Manager, same as `TELEGRAM_BOT_TOKEN` there), not on the gateway. **Direct `@mention` assignment** is also live: explicitly @-mentioning the bot (a real Telegram mention entity, detected in `telegram_bot/bot.py`) skips the ownership question and assigns straight to the sender — a passive task-shaped mention in conversation still asks as before, unchanged. All three shipped together in [PR #13](https://github.com/tutkumakyildiz/CoS/pull/13).
+
 The **web dashboard** is fully built and unit-tested (`src/cos/webapp`, both Docker images pushed to ECR, the `cos-webapp-instance-role` IAM role created) and confirmed working end-to-end when run locally against the real production data (real tasks, real gateway status), but **not yet deployed anywhere reachable over the internet** — paused with the hosting approach still undecided. App Runner is blocked account-wide (`SubscriptionRequiredException`, not an IAM issue); an ECS Fargate + ALB fallback got as far as an `iam:CreateServiceLinkedRole` block on this account's first-ever ALB. See `deploy/webapp/README.md`'s "Status" section for exact state and options before resuming.
 
 ## Model provider
@@ -193,13 +195,17 @@ src/cos/
   tools/
     task_store.py                 # create/update/query tasks, weekly metrics
     telegram_tools.py             # send_message, ask_choice
+    calendar_tool.py              # check_upcoming_events, create_event — real Google Calendar API
+    search_tool.py                # web_search — real Tavily web search
   telegram_bot/
-    bot.py                        # long-poll listener, callback routing, scheduled jobs
+    bot.py                        # long-poll listener, callback routing, scheduled jobs, @mention detection
   webapp/                         # optional read-only dashboard (see "Web dashboard" above)
     app.py                        # FastAPI app factory
     auth.py                       # shared-password login + session gate
     tasks_view.py                 # GET /tasks — task list
     bot_status.py                 # GET /status, POST /status/restart — gateway ECS health/restart
+scripts/
+  authorize_google_calendar.py    # one-time local OAuth script for GOOGLE_REFRESH_TOKEN
 tests/
   test_task_store.py
   test_bot.py
@@ -208,6 +214,8 @@ tests/
   test_persistence_dynamodb.py
   test_persistence_sqlite.py
   test_response_tracker.py
+  test_calendar_tool.py
+  test_search_tool.py
   test_webapp_tasks.py
   test_webapp_status.py
 deploy/
