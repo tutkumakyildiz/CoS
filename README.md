@@ -36,7 +36,6 @@ CoS splits into a **gateway** and a **brain**, because Amazon Bedrock AgentCore 
 
 - **Gateway** (`telegram_bot/bot.py`) — a normal long-running process: the Telegram long-poll listener, plus the daily-nudge and weekly-metrics `JobQueue` schedulers. Unchanged regardless of which brain path is active. Runs as an always-on **ECS Fargate** task in production — see "Deploying the gateway" below.
 - **Brain** (`brain.py` / `agent.py`) — the actual Strands Agent and its tool-calling loop. By default it's invoked as a deployed **Bedrock AgentCore Runtime** endpoint (a container built from the root `Dockerfile`, running `runtime_entrypoint.py`, invoked per message via `invoke_agent_runtime`), backed by **Amazon Bedrock** (Claude) and **DynamoDB** (`cos_tasks` table). A local, in-process fallback path (direct Anthropic API + SQLite, no AgentCore round-trip) stays available behind config flags — see "Model provider" and "Gateway/brain mode" below.
-- **Web dashboard** (`webapp/`) — an optional, separate read-only view: a task list and a gateway status/restart panel, behind a shared-password login. Runs on **AWS App Runner**. See "Web dashboard" below.
 
 ## Features
 
@@ -51,20 +50,6 @@ CoS splits into a **gateway** and a **brain**, because Amazon Bedrock AgentCore 
 - **Google Calendar** — cross-references seasonal/recurring tasks against real calendar events, and can put a task with a due date onto the calendar. Optional; same section below.
 - **Amazon product search** — finds/compares products and returns a link for requests like "find a dishwasher detergent on Amazon" (via SerpApi's Amazon Search API). Finds and links only — never purchases anything. Optional; see "Optional: web search + Google Calendar + Amazon product search" below.
 - **Direct `@mention` assignment** — explicitly @-mentioning the bot skips the ownership question and assigns straight to the sender.
-
-## Status
-
-Core MVP is built and live-tested end-to-end in a real household group: capture, delegation, both completion paths, daily nudges, weekly stats, and the reply safety net all work in production use today.
-
-Runs on **Amazon Bedrock** (Claude via `strands.models.bedrock.BedrockModel`, EU cross-region inference profile in `eu-central-1`), **DynamoDB** (`cos_tasks` table, `PAY_PER_REQUEST`), and **Bedrock AgentCore Runtime** (the "brain" — `runtime_entrypoint.py`, deployed as a container, invoked per-message via `invoke_agent_runtime`) — see "Model provider" and "Gateway/brain mode" below. The direct-Anthropic-API, SQLite, and in-process-agent paths are all kept as fallbacks (`COS_MODEL_PROVIDER=anthropic`, `COS_PERSISTENCE_BACKEND=sqlite`, `COS_AGENT_MODE=local`). Real household task data was migrated from the original SQLite file into DynamoDB, not started fresh. Live-verified end-to-end through the deployed AgentCore Runtime: an inbound message, a button-tap callback, and a scheduled daily-nudge job all worked, including the reply-reliability safety net.
-
-The **gateway** now runs live on **ECS Fargate** (`cos-cluster`/`cos-gateway`, `eu-central-1`) instead of a local process — cutover completed and live-verified: clean startup with no Telegram polling conflicts, a real inbound message and a real button-tap callback both round-tripped correctly through the deployed AgentCore brain and back to Telegram. `TELEGRAM_BOT_TOKEN` now lives in Secrets Manager rather than a plaintext deploy file.
-
-**Web search and Google Calendar are both live** (see "Features" above and "Optional: web search + Google Calendar + Amazon product search" under Setup) — real Tavily and Google Calendar API v3 integrations, not stubs; both live-verified against the real deployed brain (a real search query answered, a real task landed on the real calendar). Credentials for both are set as `environmentVariables` on the AgentCore Runtime (`deploy/agentcore-runtime-create-request.json`, gitignored — real secrets, not Secrets Manager, same as `TELEGRAM_BOT_TOKEN` there), not on the gateway. **Direct `@mention` assignment** is also live: explicitly @-mentioning the bot (a real Telegram mention entity, detected in `telegram_bot/bot.py`) skips the ownership question and assigns straight to the sender — a passive task-shaped mention in conversation still asks as before, unchanged. All three shipped together in [PR #13](https://github.com/tutkumakyildiz/CoS/pull/13).
-
-**Amazon product search is also live** (`cos/tools/amazon_tool.py`, SerpApi's Amazon Search API) — `SERPAPI_API_KEY` is set in the AgentCore Runtime's `environmentVariables` alongside the Tavily/Google Calendar credentials (runtime version 5), and live-verified end-to-end: a real `@`-mention request in the household chat ("find us amazon choice dishwasher detergent") triggered a real SerpApi Amazon Search call (confirmed via SerpApi's account usage counter) and a real product link came back over Telegram.
-
-The **web dashboard** is fully built and unit-tested (`src/cos/webapp`, both Docker images pushed to ECR, the `cos-webapp-instance-role` IAM role created) and confirmed working end-to-end when run locally against the real production data (real tasks, real gateway status), but **not yet deployed anywhere reachable over the internet** — paused with the hosting approach still undecided. App Runner is blocked account-wide (`SubscriptionRequiredException`, not an IAM issue); an ECS Fargate + ALB fallback got as far as an `iam:CreateServiceLinkedRole` block on this account's first-ever ALB. See `deploy/webapp/README.md`'s "Status" section for exact state and options before resuming.
 
 ## Model provider
 
@@ -88,12 +73,6 @@ The gateway is a blocking Telegram long-poll process with two `JobQueue` schedul
 
 Full setup, cutover sequence (how to move from a local `python -m cos.main` process to the ECS-hosted one without hitting that conflict), and redeploy commands: see [`deploy/gateway/README.md`](deploy/gateway/README.md).
 
-## Web dashboard
-
-An optional read-only dashboard (`src/cos/webapp`, install with `pip install -e ".[webapp]"`): a task list (open + done, filterable by status/owner, partner display names resolved via `household.json`) and a bot status/restart panel (checks the gateway's ECS service health, can trigger a redeploy). Server-rendered FastAPI + Jinja2, no SPA framework — this is a basic internal tool, not a task-editing UI (task changes still only happen via Telegram, matching CoS's actual design point). Gated behind a single shared password (`COS_WEBAPP_PASSWORD`) and a signed session cookie (`COS_WEBAPP_SESSION_SECRET`) — no per-user accounts.
-
-Run locally: `python -m cos.webapp` (reads the same `.env`/`household.json` as the bot, plus the two `COS_WEBAPP_*` vars — see `.env.example`). Deploys on **AWS App Runner** — image built and pushed, IAM role created, but the App Runner service itself isn't up yet (blocked on account activation, see "Status" above) — see [`deploy/webapp/README.md`](deploy/webapp/README.md).
-
 ## Setup
 
 ### 1. Install
@@ -103,8 +82,6 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -e ".[dev]"
 ```
-
-(Add `,webapp` to that extras list — `pip install -e ".[dev,webapp]"` — if you also want to run the web dashboard locally; see "Web dashboard" below.)
 
 ### 2. Get a Telegram bot token
 
@@ -206,11 +183,6 @@ src/cos/
     amazon_tool.py                # search_amazon_products — real SerpApi Amazon search (find/link only, no purchase)
   telegram_bot/
     bot.py                        # long-poll listener, callback routing, scheduled jobs, @mention detection
-  webapp/                         # optional read-only dashboard (see "Web dashboard" above)
-    app.py                        # FastAPI app factory
-    auth.py                       # shared-password login + session gate
-    tasks_view.py                 # GET /tasks — task list
-    bot_status.py                 # GET /status, POST /status/restart — gateway ECS health/restart
 scripts/
   authorize_google_calendar.py    # one-time local OAuth script for GOOGLE_REFRESH_TOKEN
 tests/
@@ -224,12 +196,9 @@ tests/
   test_calendar_tool.py
   test_search_tool.py
   test_amazon_tool.py
-  test_webapp_tasks.py
-  test_webapp_status.py
 deploy/
-  iam/                            # reference IAM policy templates (AgentCore, gateway, webapp roles)
+  iam/                            # reference IAM policy templates (AgentCore, gateway roles)
   gateway/                        # gateway Dockerfile + ECS task-def/service templates + deploy guide
-  webapp/                         # webapp Dockerfile + App Runner deploy guide
 docs/
   architecture.svg                # diagram referenced above
 ```
