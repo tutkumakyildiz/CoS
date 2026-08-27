@@ -8,14 +8,6 @@ CoS is a Telegram bot that lives inside your household group chat and quietly ma
 
 Instead of a chore app nobody opens, CoS listens to the conversation you're already having. Mention something that needs doing — "we're out of milk," "someone needs to book the dentist" — and CoS captures it as a structured task automatically, no data entry required.
 
-From there, CoS handles the full lifecycle of a task:
-
-- **Delegation** — it asks who's taking ownership via inline buttons, or offers a "Split — let's talk" option when a task needs a real conversation instead of a snap assignment.
-- **Completion** — tasks close naturally, either by tapping "Done" on a reminder or just saying so in chat ("I bought milk").
-- **Daily nudges** — owners get reminded of what's due soon, posted publicly in the group and addressed to them by name, so accountability stays visible to everyone, not just the person nagging.
-- **On-demand queries** — anyone can ask CoS what's open right now ("what should I get from the market") and get a live answer.
-- **Weekly stats** — a neutral, factual summary of tasks captured and completed per partner, and how many were resolved without needing a reminder at all. No praise, no blame — just visibility.
-
 ## Who it's for
 
 Couples and households who split responsibilities but keep running into the same argument: one person is doing all the remembering, even when chores are technically "shared." CoS is for any household — partners, roommates, or families — that wants task ownership to be explicit and measurable instead of assumed.
