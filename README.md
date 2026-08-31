@@ -2,19 +2,38 @@
 
 **Track:** Everyday Agents
 
+## Demo
+
+📺 **[Watch the CoS demo on YouTube](https://youtu.be/CPVxmaLTcx4)**
+
 ## What it does
 
-CoS is a Telegram bot that lives inside your household group chat and quietly manages the mental load of running a home — the invisible layer of remembering, assigning, and tracking chores, errands, and to-dos that usually falls disproportionately on one partner.
+CoS is a Telegram bot that lives inside your household group chat and quietly manages the mental load of running a home.
 
-Instead of a chore app nobody opens, CoS listens to the conversation you're already having. Mention something that needs doing — "we're out of milk," "someone needs to book the dentist" — and CoS captures it as a structured task automatically, no data entry required.
+**It captures what you say in passing.** Someone types normally — "We need to book Mia's dentist appointment before September" — and CoS picks it up, adds it to the household's list, and asks who's taking it. Emre takes it. No app to open, no list to maintain by hand.
+
+**It remembers so no one has to.** Days later, right before the deadline, CoS nudges: "Emre, reminder: book Mia's dentist appointment, due August 31st." Nobody had to think to check.
+
+**It answers, and it closes tasks the way people actually talk.** Ask "What's on our shopping list?" and it replies instantly. Emre doesn't tick a box — he just says "I bought eggs, salt and biscuits" in chat, and CoS marks all three done. It's built around how the household already communicates, not a new habit to learn.
+
+**It doesn't just track — it does the legwork.** Ask "What are IKEA's hours in Haarlem?" and it looks it up. Tell it to book the dentist for September 3rd and it adds a real event to your shared calendar, not just a note. Ask it to find a dishwasher detergent on Amazon and it comes back with real options, ratings, and links — so you're not the one doing the digging. It's less like a to-do list and more like an assistant who gets things off your plate.
+
+**And every week it shares a neutral summary** with the whole household — no finger-pointing, just visibility. That visibility is what actually fixes the imbalance: you can't fairly share work you can't see.
 
 ## Who it's for
 
-Couples and households who split responsibilities but keep running into the same argument: one person is doing all the remembering, even when chores are technically "shared." CoS is for any household — partners, roommates, or families — that wants task ownership to be explicit and measurable instead of assumed.
+**Couples** who:
+
+- want to share the mental load fairly, and
+- want to hand part of that load off to an agent that runs in the background.
 
 ## Why it matters
 
-Research on household labor consistently points to the mental load — the invisible work of noticing, planning, and tracking — as one of the most persistent drivers of inequity at home, separate from who does the physical task. CoS doesn't just split chores; it makes the invisible visible, turning "I told you to remember this" into a transparent, shared system that lives where the household already talks.
+Uneven mental load at home — the invisible work of noticing, planning, and tracking, separate from who does the physical task — is a form of **inequality** with measurable spillover:
+
+- **Economic** — lower labor market participation, missed promotions, and higher burnout for women (World Bank, 2026).
+- **Health and relationships** — worse mental health and relationship strain, especially when perceived fairness is low (*Women & Therapy*, 2026).
+- **Civic** — political and civic engagement effects, as cognitive overload reduces capacity for other interests (*European Sociological Review*, 2026).
 
 ## How it works
 
