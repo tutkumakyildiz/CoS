@@ -2,6 +2,10 @@
 
 **Track:** Everyday Agents
 
+## Demo
+
+📺 **[Watch the CoS demo on YouTube](https://youtu.be/CPVxmaLTcx4)**
+
 ## What it does
 
 CoS is a Telegram bot that lives inside your household group chat and quietly manages the mental load of running a home — the invisible layer of remembering, assigning, and tracking chores, errands, and to-dos that usually falls disproportionately on one partner.
